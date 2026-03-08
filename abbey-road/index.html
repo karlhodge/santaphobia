@@ -9,7 +9,7 @@
 body{background:#000;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#fff}
 canvas{display:block}
 
-/* Overlay */
+/* Full-screen entry overlay with title, controls legend, and enter button */
 #overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;transition:opacity 0.5s}
 #overlay.hidden{opacity:0;pointer-events:none}
 #overlay h1{font-size:3.2rem;font-weight:200;letter-spacing:0.6em;margin-bottom:0.3em;text-transform:uppercase}
@@ -20,10 +20,10 @@ canvas{display:block}
 #enterBtn:hover:not(:disabled){border-color:#ffcc66;color:#ffcc66}
 #enterBtn:disabled{opacity:0.4;cursor:default}
 
-/* Status */
+/* Loading/ready status text in bottom-left corner */
 #status{position:fixed;bottom:16px;left:16px;font-size:0.7rem;font-weight:300;letter-spacing:0.12em;color:#888;z-index:90}
 
-/* Crosshair */
+/* Centre-screen crosshair shown during pointer lock */
 #crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:80;display:none}
 #crosshair .h,#crosshair .v{position:absolute;background:#fff}
 #crosshair .h{width:20px;height:2px;top:-1px;left:-10px}
@@ -32,6 +32,7 @@ canvas{display:block}
 </head>
 <body>
 
+<!-- Entry overlay — hidden once pointer lock is acquired -->
 <div id="overlay">
   <h1>Abbey Road</h1>
   <h2>Studio Two &middot; 1966</h2>
@@ -41,9 +42,13 @@ canvas{display:block}
   <button id="enterBtn" disabled>Loading&hellip;</button>
 </div>
 
+<!-- Status text updates during model loading -->
 <div id="status">Fetching model&hellip;</div>
+
+<!-- Debug HUD showing live camera coordinates (top-right, visible during pointer lock) -->
 <div id="coordHUD" style="position:fixed;top:12px;right:12px;font-family:monospace;font-size:0.8rem;color:#0f0;background:rgba(0,0,0,0.6);padding:8px 12px;border-radius:4px;z-index:90;display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
 
+<!-- Crosshair rendered at screen centre during first-person navigation -->
 <div id="crosshair"><div class="h"></div><div class="v"></div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -51,13 +56,14 @@ canvas{display:block}
 (function() {
 'use strict';
 
-// ── DOM refs ──
+// ── Cached DOM references ──
 const overlay   = document.getElementById('overlay');
 const enterBtn  = document.getElementById('enterBtn');
 const statusEl  = document.getElementById('status');
 const crosshair = document.getElementById('crosshair');
+const coordHUD  = document.getElementById('coordHUD');
 
-// ── Renderer ──
+// ── Three.js renderer with physically-based lighting ──
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
@@ -68,21 +74,21 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// ── Scene ──
+// ── Scene with warm dark background and distance fog ──
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#18140d');
 scene.fog = new THREE.FogExp2(0x18140d, 0.03);
 
-// ── Camera ──
+// ── First-person camera ──
 const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.05, 200);
-camera.position.set(0, 1.7, 0);
-camera.rotation.order = 'YXZ';
+camera.rotation.order = 'YXZ'; // Allows independent yaw (Y) and pitch (X) rotation
 
-// ── Lighting ──
+// ── Studio lighting ──
+// Soft ambient fill to prevent pure-black shadows
 scene.add(new THREE.AmbientLight(0xfff0d0, 0.4));
-const hemi = new THREE.HemisphereLight(0xfff8e8, 0x221c10, 0.3);
-scene.add(hemi);
-
+// Hemisphere light simulates sky/ground colour bounce
+scene.add(new THREE.HemisphereLight(0xfff8e8, 0x221c10, 0.3));
+// 3x3 grid of ceiling point lights for even studio illumination
 for (let gx = -1; gx <= 1; gx++) {
   for (let gz = -1; gz <= 1; gz++) {
     const pl = new THREE.PointLight(0xfffbe8, 1.0, 14);
@@ -92,36 +98,40 @@ for (let gx = -1; gx <= 1; gx++) {
     scene.add(pl);
   }
 }
-
+// Warm orange glow near the mixing console
 const consolGlow = new THREE.PointLight(0xff7722, 0.5, 8);
 consolGlow.position.set(0, 1.5, -8);
 scene.add(consolGlow);
 
-// ── Resize ──
+// ── Responsive canvas resize ──
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ── State ──
+// ── Player state and movement constants ──
 let pointerLocked = false;
 let modelReady = false;
 const moveState = { forward: false, backward: false, left: false, right: false };
-const MOVE_SPEED = 0.8;
-const LOOK_SENS = 0.002;
-const PITCH_LIMIT = 1.2;
+
+const MOVE_SPEED = 0.8;         // Walking speed in units/second
+const LOOK_SENS  = 0.002;       // Mouse sensitivity (radians per pixel)
+const PITCH_LIMIT = 1.2;        // Max vertical look angle (~69 degrees)
+const EYE_HEIGHT  = 0.121;      // Camera Y position (calibrated to model floor)
+const COLLISION_DISTANCE = 0.15; // Minimum distance from walls before blocking movement
+
 let yaw = 0, pitch = 0;
 
-// Collision detection
-const collisionMeshes = [];  // meshes to collide against (walls, floor, furniture)
-const COLLISION_DISTANCE = 0.15; // how close we can get to walls
+// All scene meshes used for wall/obstacle collision raycasting
+const collisionMeshes = [];
 
-// ── Pointer Lock ──
-function requestLock() {
-  renderer.domElement.requestPointerLock();
-}
+// Reusable raycaster for per-frame collision checks (avoids allocation in hot loop)
+const collisionRay = new THREE.Raycaster();
 
+// ── Pointer lock controls ──
+// Entering pointer lock hides the overlay and shows the crosshair;
+// exiting (Esc) reverses this so the user sees the entry screen again.
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = document.pointerLockElement === renderer.domElement;
   if (pointerLocked) {
@@ -133,6 +143,7 @@ document.addEventListener('pointerlockchange', () => {
   }
 });
 
+// First-person mouse look: yaw (left/right) and pitch (up/down) with clamping
 document.addEventListener('mousemove', (e) => {
   if (!pointerLocked) return;
   yaw   -= e.movementX * LOOK_SENS;
@@ -141,20 +152,18 @@ document.addEventListener('mousemove', (e) => {
   camera.rotation.set(pitch, yaw, 0);
 });
 
-// ── Enter button ──
+// Enter button requests pointer lock to begin first-person navigation
 enterBtn.addEventListener('click', () => {
-  if (!modelReady) return;
-  requestLock();
+  if (modelReady) renderer.domElement.requestPointerLock();
 });
 
-// ── Keyboard ──
+// ── WASD keyboard input ──
 const keyMap = {
   KeyW: 'forward', ArrowUp: 'forward',
   KeyS: 'backward', ArrowDown: 'backward',
   KeyA: 'left', ArrowLeft: 'left',
   KeyD: 'right', ArrowRight: 'right',
 };
-
 document.addEventListener('keydown', (e) => {
   if (keyMap[e.code]) moveState[keyMap[e.code]] = true;
 });
@@ -162,11 +171,14 @@ document.addEventListener('keyup', (e) => {
   if (keyMap[e.code]) moveState[keyMap[e.code]] = false;
 });
 
-// ── Status helper ──
+// ── Status text helper ──
 function setStatus(msg) { statusEl.textContent = msg; }
 
 // =============================================
-// INLINE GLTF PARSER
+// GLTF LOADER
+// Parses .gltf/.glb files without external loader
+// libraries, building Three.js geometry, materials,
+// and the scene node hierarchy directly.
 // =============================================
 
 async function loadGLTF() {
@@ -177,27 +189,29 @@ async function loadGLTF() {
     if (!gltfResp.ok) throw new Error('Failed to fetch scene.gltf: ' + gltfResp.status);
     const gltfArrayBuf = await gltfResp.arrayBuffer();
 
-    // Check for GLB magic
+    // Detect binary GLB format via magic number (0x46546C67 = "glTF")
     const magic = new Uint32Array(gltfArrayBuf, 0, 1)[0];
     let gltf;
     let binBuffer;
 
     if (magic === 0x46546C67) {
-      // GLB
+      // GLB: JSON chunk starts at byte 20, binary chunk follows
       const view = new DataView(gltfArrayBuf);
       const jsonLen = view.getUint32(12, true);
       const jsonStr = new TextDecoder().decode(new Uint8Array(gltfArrayBuf, 20, jsonLen));
       gltf = JSON.parse(jsonStr);
-      const binOffset = 20 + jsonLen + 8;
+      const binOffset = 20 + jsonLen + 8; // 8 bytes for bin chunk header
       binBuffer = gltfArrayBuf.slice(binOffset);
     } else {
+      // Plain JSON .gltf — binary data loaded separately via buffer URIs
       const jsonStr = new TextDecoder().decode(gltfArrayBuf);
       gltf = JSON.parse(jsonStr);
     }
 
     setStatus('Parsing\u2026');
 
-    // Load binary buffer
+    // ── Load binary geometry buffers ──
+    // GLB embeds the buffer inline; .gltf references external .bin files
     const buffers = [];
     for (const bufDef of gltf.buffers || []) {
       if (binBuffer && !bufDef.uri) {
@@ -209,7 +223,8 @@ async function loadGLTF() {
       }
     }
 
-    // Load textures
+    // ── Load texture images ──
+    // Each GLTF image becomes a Three.js texture with sRGB encoding
     const textureLoader = new THREE.TextureLoader();
     const textures = [];
     const textureLoadErrors = [];
@@ -236,7 +251,7 @@ async function loadGLTF() {
       console.warn('Textures that failed to load:', textureLoadErrors);
     }
 
-    // Ensure all textures tile properly
+    // Enable seamless tiling on all textures (prevents edge clamping artifacts on floors/walls)
     for (const tex of textures) {
       if (tex) {
         tex.wrapS = THREE.RepeatWrapping;
@@ -244,15 +259,14 @@ async function loadGLTF() {
       }
     }
 
-    // Resolve sampler → texture
-    const gltfTextures = (gltf.textures || []).map(t => {
-      const sourceIdx = t.source;
-      return textures[sourceIdx] || null;
-    });
+    // Map GLTF texture indices to loaded Three.js textures via their image source index
+    const gltfTextures = (gltf.textures || []).map(t => textures[t.source] || null);
 
     setStatus('Building geometry\u2026');
 
-    // ── Helper: get accessor data ──
+    // ── Accessor data extraction ──
+    // Reads typed array data from a GLTF accessor, handling byte offsets,
+    // component types (float/uint16/uint32/etc), and interleaved buffer layouts.
     function getAccessorData(accIdx) {
       const acc = gltf.accessors[accIdx];
       const bv = gltf.bufferViews[acc.bufferView];
@@ -263,6 +277,7 @@ async function loadGLTF() {
       const count = acc.count;
       const stride = bv.byteStride || 0;
 
+      // Map GLTF component type codes to JS TypedArray constructors
       let TypedArray;
       switch (acc.componentType) {
         case 5120: TypedArray = Int8Array; break;
@@ -274,8 +289,9 @@ async function loadGLTF() {
         default: TypedArray = Float32Array;
       }
 
+      // Interleaved buffers have a stride larger than the element size,
+      // requiring manual extraction of each component
       if (stride && stride !== numComponents * TypedArray.BYTES_PER_ELEMENT) {
-        // Interleaved: must manually deinterleave
         const result = new TypedArray(count * numComponents);
         const srcView = new DataView(buf);
         for (let i = 0; i < count; i++) {
@@ -291,11 +307,14 @@ async function loadGLTF() {
         return { data: result, count, numComponents, componentType: acc.componentType };
       }
 
+      // Contiguous layout: create a direct view into the buffer
       const data = new TypedArray(buf, byteOffset, count * numComponents);
       return { data, count, numComponents, componentType: acc.componentType };
     }
 
-    // ── Build materials ──
+    // ── PBR material construction ──
+    // Converts each GLTF material definition into a Three.js MeshStandardMaterial
+    // using base colour, metalness, roughness, and optional texture maps.
     const materials = (gltf.materials || []).map(matDef => {
       const params = {};
       const pbr = matDef.pbrMetallicRoughness || {};
@@ -314,7 +333,6 @@ async function loadGLTF() {
 
       params.metalness = pbr.metallicFactor !== undefined ? pbr.metallicFactor : 0;
       params.roughness = pbr.roughnessFactor !== undefined ? pbr.roughnessFactor : 1;
-
       if (matDef.doubleSided) params.side = THREE.DoubleSide;
 
       const mat = new THREE.MeshStandardMaterial(params);
@@ -322,10 +340,12 @@ async function loadGLTF() {
       return mat;
     });
 
-    // Default material
+    // Fallback material for primitives with no material assigned
     const defaultMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 });
 
-    // ── Build meshes ──
+    // ── Mesh builder ──
+    // Constructs Three.js geometry from GLTF mesh primitives (position, normal,
+    // UV, and index data). Returns a single Mesh or a Group if multiple primitives.
     function buildMesh(meshIdx) {
       const meshDef = gltf.meshes[meshIdx];
       const group = new THREE.Group();
@@ -338,29 +358,22 @@ async function loadGLTF() {
           const d = getAccessorData(prim.attributes.POSITION);
           geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(d.data), 3));
         }
-
         if (prim.attributes.NORMAL !== undefined) {
           const d = getAccessorData(prim.attributes.NORMAL);
           geom.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(d.data), 3));
         }
-
         if (prim.attributes.TEXCOORD_0 !== undefined) {
           const d = getAccessorData(prim.attributes.TEXCOORD_0);
           geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(d.data), 2));
         }
-
         if (prim.indices !== undefined) {
           const d = getAccessorData(prim.indices);
-          if (d.componentType === 5125) {
-            geom.setIndex(new THREE.BufferAttribute(new Uint32Array(d.data), 1));
-          } else {
-            geom.setIndex(new THREE.BufferAttribute(new Uint16Array(d.data), 1));
-          }
+          const IndexArray = d.componentType === 5125 ? Uint32Array : Uint16Array;
+          geom.setIndex(new THREE.BufferAttribute(new IndexArray(d.data), 1));
         }
 
-        if (!prim.attributes.NORMAL) {
-          geom.computeVertexNormals();
-        }
+        // Auto-generate normals if not provided by the model
+        if (!prim.attributes.NORMAL) geom.computeVertexNormals();
 
         const mat = prim.material !== undefined ? materials[prim.material] : defaultMat;
         const mesh = new THREE.Mesh(geom, mat);
@@ -369,26 +382,21 @@ async function loadGLTF() {
         group.add(mesh);
       }
 
+      // Unwrap single-child groups to keep the scene graph flat
       return group.children.length === 1 ? group.children[0] : group;
     }
 
-    // ── Build node tree ──
+    // ── Node tree builder ──
+    // Recursively constructs the GLTF scene hierarchy, applying per-node
+    // transforms (matrix or TRS) and attaching child nodes.
     function buildNode(nodeIdx) {
       const nodeDef = gltf.nodes[nodeIdx];
-      let obj;
-
-      if (nodeDef.mesh !== undefined) {
-        obj = buildMesh(nodeDef.mesh);
-      } else {
-        obj = new THREE.Group();
-      }
-
+      const obj = nodeDef.mesh !== undefined ? buildMesh(nodeDef.mesh) : new THREE.Group();
       obj.name = nodeDef.name || 'node_' + nodeIdx;
 
+      // Apply node transform: either a 4x4 matrix or individual translation/rotation/scale
       if (nodeDef.matrix) {
-        const m = new THREE.Matrix4();
-        m.fromArray(nodeDef.matrix);
-        obj.applyMatrix4(m);
+        obj.applyMatrix4(new THREE.Matrix4().fromArray(nodeDef.matrix));
       } else {
         if (nodeDef.translation) obj.position.fromArray(nodeDef.translation);
         if (nodeDef.rotation) obj.quaternion.fromArray(nodeDef.rotation);
@@ -396,99 +404,70 @@ async function loadGLTF() {
       }
 
       if (nodeDef.children) {
-        for (const childIdx of nodeDef.children) {
-          obj.add(buildNode(childIdx));
-        }
+        for (const childIdx of nodeDef.children) obj.add(buildNode(childIdx));
       }
 
       return obj;
     }
 
-    // Build scene
+    // ── Assemble the GLTF scene into Three.js ──
     const sceneDef = gltf.scenes[gltf.scene || 0];
     const root = new THREE.Group();
     root.name = 'GLTFRoot';
-    for (const nodeIdx of sceneDef.nodes) {
-      root.add(buildNode(nodeIdx));
-    }
-
-    // ── Scale & centre on the ROOM, ignoring distant outlier geometry ──
-    // The model has an outlier mesh at GLTF Z≈-466 that makes the overall
-    // bounding box ~50× larger than the studio room. We find a known interior
-    // object (redchair1), use it as an anchor, and only include nearby meshes
-    // when computing the room bounds used for scaling and centering.
+    for (const nodeIdx of sceneDef.nodes) root.add(buildNode(nodeIdx));
 
     scene.add(root);
     root.updateMatrixWorld(true);
 
-    // Step 1 — locate anchor object's real geometry centre
+    // ── Scale and centre the room ──
+    // The model contains an outlier mesh at Z≈-466 that inflates the overall
+    // bounding box ~50x. We anchor on 'redchair1' (a known interior object)
+    // and only include meshes within 2000 units to compute the true room bounds.
     let anchorNode = null;
     root.traverse(obj => { if (obj.name === 'redchair1') anchorNode = obj; });
-    const anchorBox = new THREE.Box3().setFromObject(anchorNode || root);
     const anchorPos = new THREE.Vector3();
-    anchorBox.getCenter(anchorPos);
-    console.log('Anchor centre (pre-scale):', anchorPos);
+    new THREE.Box3().setFromObject(anchorNode || root).getCenter(anchorPos);
 
-    // Step 2 — build room-only bounding box (meshes within 2000 units of anchor)
+    // Build bounding box from room-local meshes only
     const roomBox = new THREE.Box3();
     root.traverse(obj => {
       if (obj.isMesh) {
         const mb = new THREE.Box3().setFromObject(obj);
         const mc = new THREE.Vector3();
         mb.getCenter(mc);
-        if (mc.distanceTo(anchorPos) < 2000) {
-          roomBox.union(mb);
-        }
+        if (mc.distanceTo(anchorPos) < 2000) roomBox.union(mb);
       }
     });
     const roomSize = new THREE.Vector3();
     roomBox.getSize(roomSize);
     const roomCentre = new THREE.Vector3();
     roomBox.getCenter(roomCentre);
-    console.log('Room bounds (pre-scale):', roomBox.min, roomBox.max, 'size:', roomSize);
 
-    // Step 3 — scale so the room's longest axis fits in 20 units
-    const roomMax = Math.max(roomSize.x, roomSize.y, roomSize.z);
-    const scaleFactor = 20 / roomMax;
+    // Normalise so the room's longest axis spans 20 world units
+    const scaleFactor = 20 / Math.max(roomSize.x, roomSize.y, roomSize.z);
     root.scale.multiplyScalar(scaleFactor);
 
-    // Step 4 — offset root so room centre is at world origin, floor at y=0
-    root.position.x = -roomCentre.x * scaleFactor;
-    root.position.z = -roomCentre.z * scaleFactor;
-    root.position.y = -roomBox.min.y * scaleFactor;
-
+    // Position root so the room is centred at the origin with the floor at y=0
+    root.position.set(
+      -roomCentre.x * scaleFactor,
+      -roomBox.min.y * scaleFactor,
+      -roomCentre.z * scaleFactor
+    );
     root.updateMatrixWorld(true);
 
-    // ── Inspect scene graph ──
-    console.group('Scene Graph');
-    const meshNames = [], groupNames = [], lightNames = [];
+    // ── Collect all meshes for collision detection ──
     root.traverse(obj => {
-      if (obj.isMesh) meshNames.push(obj.name);
-      else if (obj.isLight) lightNames.push(obj.name);
-      else groupNames.push(obj.name);
+      if (obj.isMesh) collisionMeshes.push(obj);
     });
-    console.log('Meshes:', meshNames);
-    console.log('Groups:', groupNames);
-    console.log('Lights:', lightNames);
-    console.groupEnd();
 
-    // ── Collect collision meshes (all scene meshes) ──
-    root.traverse(obj => {
-      if (obj.isMesh) {
-        collisionMeshes.push(obj);
-      }
-    });
-    console.log('Collision meshes:', collisionMeshes.length);
-
-    // ── Spawn camera at manually calibrated position ──
-    const SPAWN = { x: -6.043, y: 0.121, z: 9.748 };
-    const SPAWN_YAW = 345 * Math.PI / 180; // 345°
-    camera.position.set(SPAWN.x, SPAWN.y, SPAWN.z);
-    yaw = SPAWN_YAW; pitch = 0;
+    // ── Place camera at calibrated spawn point facing into the room ──
+    const SPAWN_YAW = 345 * Math.PI / 180;
+    camera.position.set(-6.043, EYE_HEIGHT, 9.748);
+    yaw = SPAWN_YAW;
+    pitch = 0;
     camera.rotation.set(0, yaw, 0);
-    console.log('Camera placed at:', camera.position);
 
-    // ── Done ──
+    // ── Model loaded — enable the enter button ──
     setStatus('Ready');
     modelReady = true;
     enterBtn.disabled = false;
@@ -498,27 +477,25 @@ async function loadGLTF() {
       console.warn('Note: ' + textureLoadErrors.length + ' textures failed to load. Materials will use base colors instead.');
     }
 
-    console.log('Room dimensions after auto-scale:', roomSize.clone().multiplyScalar(scaleFactor));
-    console.log('Scale factor applied:', scaleFactor);
-
   } catch (err) {
     console.error('GLTF load error:', err);
     setStatus('Error: ' + err.message);
   }
 }
 
-// ── Animation loop ──
+// ── Main render loop ──
 const clock = new THREE.Clock();
 
 function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
 
-  // Movement with collision detection
   if (pointerLocked) {
+    // ── First-person movement ──
+    // Build a horizontal movement vector from camera orientation and WASD input
     const dir = new THREE.Vector3();
     const front = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-    front.y = 0;
+    front.y = 0; // Project onto horizontal plane
     front.normalize();
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
     right.y = 0;
@@ -532,19 +509,16 @@ function animate() {
     if (dir.lengthSq() > 0) {
       dir.normalize();
       const step = MOVE_SPEED * dt;
-      const newPos = camera.position.clone().add(dir.clone().multiplyScalar(step));
-      newPos.y = 0.121;
 
-      // Cast rays from player position in movement direction to detect walls
-      const collisionRay = new THREE.Raycaster();
-
-      // Check multiple ray heights for better wall detection
+      // ── Collision detection ──
+      // Cast rays at three body heights (ankles, waist, head) in the movement
+      // direction. If any ray hits geometry within the collision threshold,
+      // the move is blocked to prevent walking through walls and furniture.
       let blocked = false;
       const rayHeights = [0.3, 0.8, 1.4];
-      for (const rh of rayHeights) {
-        if (blocked) break;
+      for (let i = 0; i < rayHeights.length && !blocked; i++) {
         const origin = camera.position.clone();
-        origin.y = rh;
+        origin.y = rayHeights[i];
         collisionRay.set(origin, dir);
         collisionRay.far = COLLISION_DISTANCE + step;
         const hits = collisionRay.intersectObjects(collisionMeshes, false);
@@ -554,31 +528,28 @@ function animate() {
       }
 
       if (!blocked) {
-        camera.position.copy(newPos);
+        camera.position.addScaledVector(dir, step);
       }
     }
 
-    // Lock to calibrated eye height
-    camera.position.y = 0.121;
-  }
+    // Lock vertical position to floor level (no jumping or flying)
+    camera.position.y = EYE_HEIGHT;
 
-  // Live coordinate HUD
-  const hud = document.getElementById('coordHUD');
-  if (pointerLocked && hud) {
-    hud.style.display = 'block';
-    hud.textContent =
+    // ── Debug coordinate HUD ──
+    coordHUD.style.display = 'block';
+    coordHUD.textContent =
       `X: ${camera.position.x.toFixed(3)}\n` +
       `Y: ${camera.position.y.toFixed(3)}\n` +
       `Z: ${camera.position.z.toFixed(3)}\n` +
-      `Yaw: ${(yaw * 180 / Math.PI).toFixed(1)}°`;
-  } else if (hud) {
-    hud.style.display = 'none';
+      `Yaw: ${(yaw * 180 / Math.PI).toFixed(1)}\u00B0`;
+  } else {
+    coordHUD.style.display = 'none';
   }
 
   renderer.render(scene, camera);
 }
 
-// ── Start ──
+// ── Bootstrap ──
 loadGLTF();
 animate();
 
