@@ -57,7 +57,7 @@ canvas{display:block}
   <h1>Abbey Road</h1>
   <h2>Studio Two &middot; 1966</h2>
   <div id="controls-legend">
-    <span>W A S D</span> Move &nbsp;&middot;&nbsp; <span>Mouse</span> Look &nbsp;&middot;&nbsp; <span>Click chair</span> Sit &nbsp;&middot;&nbsp; <span>E</span> Stand &nbsp;&middot;&nbsp; <span>Esc</span> Release mouse
+    <span>W A S D</span> Move &nbsp;&middot;&nbsp; <span>Mouse</span> Look &nbsp;&middot;&nbsp; <span>1-5</span> Teleport &nbsp;&middot;&nbsp; <span>Click chair</span> Sit &nbsp;&middot;&nbsp; <span>E</span> Stand &nbsp;&middot;&nbsp; <span>Esc</span> Release mouse
   </div>
   <button id="enterBtn" disabled>Loading&hellip;</button>
 </div>
@@ -161,6 +161,10 @@ const originalMaterials = new Map();
 const highlightMat = new THREE.MeshStandardMaterial({ color: 0xffaa33, emissive: 0x441100 });
 let currentHighlight = null;
 
+// Teleport state (populated after model loads)
+let landmarks = [];
+let teleportTo = null;
+
 // ── Pointer Lock ──
 function requestLock() {
   renderer.domElement.requestPointerLock();
@@ -208,6 +212,12 @@ const keyMap = {
 document.addEventListener('keydown', (e) => {
   if (keyMap[e.code]) moveState[keyMap[e.code]] = true;
   if (e.code === 'KeyE' && seated) standUp();
+  // Number keys 1-5 → teleport to landmarks
+  const digitMatch = e.code.match(/^Digit([1-5])$/);
+  if (digitMatch && pointerLocked && typeof teleportTo === 'function') {
+    const idx = parseInt(digitMatch[1], 10) - 1;
+    if (landmarks && landmarks[idx]) teleportTo(landmarks[idx].pos);
+  }
 });
 document.addEventListener('keyup', (e) => {
   if (keyMap[e.code]) moveState[keyMap[e.code]] = false;
@@ -215,9 +225,11 @@ document.addEventListener('keyup', (e) => {
 
 // ── Sit / Stand ──
 function sitOnChair(chairInfo) {
+  // Use Box3.setFromObject to find actual mesh centre (not node origin)
+  const chairBox = new THREE.Box3().setFromObject(chairInfo.group);
   const worldPos = new THREE.Vector3();
-  chairInfo.group.getWorldPosition(worldPos);
-  camera.position.set(worldPos.x, worldPos.y + 1.1, worldPos.z);
+  chairBox.getCenter(worldPos);
+  camera.position.set(worldPos.x, worldPos.y + 0.5, worldPos.z);
   seated = true;
   seatedUI.style.display = 'block';
   tooltipEl.style.display = 'none';
@@ -493,19 +505,52 @@ async function loadGLTF() {
       root.add(buildNode(nodeIdx));
     }
 
-    // ── Auto-scale (simple: fit longest axis to 20 units) ──
-    const box = new THREE.Box3().setFromObject(root);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const maxAxis = Math.max(size.x, size.y, size.z);
-    const scaleFactor = 20 / maxAxis;
-    root.scale.multiplyScalar(scaleFactor);
-
-    // Floor at y = 0
-    box.setFromObject(root);
-    root.position.y -= box.min.y;
+    // ── Scale & centre on the ROOM, ignoring distant outlier geometry ──
+    // The model has an outlier mesh at GLTF Z≈-466 that makes the overall
+    // bounding box ~50× larger than the studio room. We find a known interior
+    // object (redchair1), use it as an anchor, and only include nearby meshes
+    // when computing the room bounds used for scaling and centering.
 
     scene.add(root);
+    root.updateMatrixWorld(true);
+
+    // Step 1 — locate anchor object's real geometry centre
+    let anchorNode = null;
+    root.traverse(obj => { if (obj.name === 'redchair1') anchorNode = obj; });
+    const anchorBox = new THREE.Box3().setFromObject(anchorNode || root);
+    const anchorPos = new THREE.Vector3();
+    anchorBox.getCenter(anchorPos);
+    console.log('Anchor centre (pre-scale):', anchorPos);
+
+    // Step 2 — build room-only bounding box (meshes within 2000 units of anchor)
+    const roomBox = new THREE.Box3();
+    root.traverse(obj => {
+      if (obj.isMesh) {
+        const mb = new THREE.Box3().setFromObject(obj);
+        const mc = new THREE.Vector3();
+        mb.getCenter(mc);
+        if (mc.distanceTo(anchorPos) < 2000) {
+          roomBox.union(mb);
+        }
+      }
+    });
+    const roomSize = new THREE.Vector3();
+    roomBox.getSize(roomSize);
+    const roomCentre = new THREE.Vector3();
+    roomBox.getCenter(roomCentre);
+    console.log('Room bounds (pre-scale):', roomBox.min, roomBox.max, 'size:', roomSize);
+
+    // Step 3 — scale so the room's longest axis fits in 20 units
+    const roomMax = Math.max(roomSize.x, roomSize.y, roomSize.z);
+    const scaleFactor = 20 / roomMax;
+    root.scale.multiplyScalar(scaleFactor);
+
+    // Step 4 — offset root so room centre is at world origin, floor at y=0
+    root.position.x = -roomCentre.x * scaleFactor;
+    root.position.z = -roomCentre.z * scaleFactor;
+    root.position.y = -roomBox.min.y * scaleFactor;
+
+    root.updateMatrixWorld(true);
 
     // ── Inspect scene graph ──
     console.group('Scene Graph');
@@ -546,46 +591,37 @@ async function loadGLTF() {
       chairPanel.appendChild(btn);
     }
 
-    // ── Build teleport landmarks from named objects ──
-    // The overall bounding box is useless for camera placement because a distant
-    // outlier at GLTF Z≈-466 puts the centre far outside the room.
-    // Instead, find real interior objects, compute their world-space centres via
-    // Box3.setFromObject (not getWorldPosition, which returns the node origin),
-    // and let the user teleport between them.
-    root.updateMatrixWorld(true);
-    const landmarks = [];
-    const landmarkNames = [
-      'redchair1', 'redchair2',
-      'Gubi_G10_Pendant_shade_lamp_light1',
-      'Gubi_G10_Pendant_shade_lamp_light5',
-      'DOOR_FRAME'
+    // ── Build teleport landmarks ──
+    // After scaling & centering, re-find interior objects via Box3.setFromObject
+    // (not getWorldPosition, which returns node origin, not mesh centre).
+    landmarks = [];
+    const landmarkDefs = [
+      { name: 'redchair1',                      label: '1 — Red Chair 1' },
+      { name: 'redchair2',                      label: '2 — Red Chair 2' },
+      { name: 'Gubi_G10_Pendant_shade_lamp_light1', label: '3 — Lamp (near)' },
+      { name: 'Gubi_G10_Pendant_shade_lamp_light5', label: '4 — Lamp (centre)' },
+      { name: 'DOOR_FRAME',                     label: '5 — Door' },
     ];
-    const friendlyNames = {
-      'redchair1': 'Red Chair 1',
-      'redchair2': 'Red Chair 2',
-      'Gubi_G10_Pendant_shade_lamp_light1': 'Lamp 1 (near)',
-      'Gubi_G10_Pendant_shade_lamp_light5': 'Lamp 5 (centre)',
-      'DOOR_FRAME': 'Door'
-    };
     root.traverse(obj => {
-      if (landmarkNames.includes(obj.name)) {
+      const def = landmarkDefs.find(d => d.name === obj.name);
+      if (def) {
         const b = new THREE.Box3().setFromObject(obj);
         const c = new THREE.Vector3();
         b.getCenter(c);
-        landmarks.push({ name: obj.name, label: friendlyNames[obj.name] || obj.name, pos: c });
-        console.log('Landmark', obj.name, 'world centre:', c.x.toFixed(3), c.y.toFixed(3), c.z.toFixed(3));
+        landmarks.push({ label: def.label, pos: c });
+        console.log('Landmark', def.label, '→', c.x.toFixed(3), c.y.toFixed(3), c.z.toFixed(3));
       }
     });
 
     // Teleport helper
-    function teleportTo(pos) {
+    teleportTo = function(pos) {
       camera.position.set(pos.x, EYE_HEIGHT, pos.z);
       yaw = 0; pitch = 0;
       camera.rotation.set(0, 0, 0);
-      console.log('Teleported to', pos);
-    }
+      console.log('Teleported to', pos.x.toFixed(2), pos.z.toFixed(2));
+    };
 
-    // Build teleport panel buttons
+    // Teleport panel buttons (visible but also mapped to number keys)
     for (const lm of landmarks) {
       const btn = document.createElement('button');
       btn.textContent = lm.label;
@@ -593,18 +629,10 @@ async function loadGLTF() {
       teleportPanel.appendChild(btn);
     }
 
-    // ── Spawn camera at first landmark (or fallback) ──
+    // ── Spawn camera at redchair1 ──
     if (landmarks.length > 0) {
       teleportTo(landmarks[0].pos);
-    } else {
-      // Last resort: box centre
-      const roomCenter = new THREE.Vector3();
-      box.setFromObject(root);
-      box.getCenter(roomCenter);
-      camera.position.set(roomCenter.x, EYE_HEIGHT, roomCenter.z);
     }
-    yaw = 0; pitch = 0;
-    camera.rotation.set(0, 0, 0);
     console.log('Camera placed at:', camera.position);
 
     // ── Done ──
