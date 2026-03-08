@@ -645,7 +645,7 @@ async function loadGLTF() {
       console.warn('Note: ' + textureLoadErrors.length + ' textures failed to load. Materials will use base colors instead.');
     }
 
-    console.log('Scene dimensions after auto-scale:', size);
+    console.log('Room dimensions after auto-scale:', roomSize.clone().multiplyScalar(scaleFactor));
     console.log('Scale factor applied:', scaleFactor);
 
   } catch (err) {
