@@ -480,19 +480,33 @@ async function loadGLTF() {
       root.add(buildNode(nodeIdx));
     }
 
+    // ── Fix coordinate system ──
+    // The Sketchfab root matrix bakes in a -90° X rotation to convert Z-up → Y-up,
+    // which makes the room stand on end. Apply a corrective rotation to restore
+    // the floor to horizontal.
+    root.rotation.x = -Math.PI / 2;
+
     // ── Auto-scale ──
+    // The model has a distant outlier at GLTF Z≈-466 that inflates the bounding
+    // box by ~50x. Scaling by the max axis would shrink the main room to < 1 unit.
+    // Instead, scale by the median dimension (ignoring the extreme outlier axis).
     const box = new THREE.Box3().setFromObject(root);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const maxAxis = Math.max(size.x, size.y, size.z);
-    const scaleFactor = 20 / maxAxis;
+    const dims = [size.x, size.y, size.z].sort((a, b) => a - b);
+    const scaleFactor = 20 / dims[1]; // median dimension → 20 units
     root.scale.multiplyScalar(scaleFactor);
 
     // Recompute after scale
     box.setFromObject(root);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    root.position.sub(center);
+
+    // Center on X axis normally
+    const cx = (box.min.x + box.max.x) / 2;
+    root.position.x -= cx;
+
+    // Anchor Z so the near face of the room sits at Z=+10,
+    // placing the room roughly from Z=-20 to Z=+10 (camera at Z=0 is inside).
+    root.position.z -= (box.max.z - 10);
 
     // Floor at y=0
     box.setFromObject(root);
@@ -540,16 +554,14 @@ async function loadGLTF() {
     }
 
     // ── Position camera inside the model ──
-    box.setFromObject(root);
-    box.getSize(size);
-    const roomCenter = new THREE.Vector3();
-    box.getCenter(roomCenter);
-    // Place at center of room floor at eye height
-    camera.position.set(roomCenter.x, EYE_HEIGHT, roomCenter.z);
+    // X is centred at 0; Z is anchored so the room straddles Z=0.
+    // Place camera at origin at eye height, facing into the room (-Z).
+    camera.position.set(0, EYE_HEIGHT, 0);
     yaw = 0; pitch = 0;
     camera.rotation.set(0, 0, 0);
+    box.setFromObject(root);
     console.log('Camera placed at:', camera.position);
-    console.log('Room bounds:', box.min, box.max);
+    console.log('Room bounds after transform:', box.min, box.max);
 
     // ── Done ──
     setStatus('Ready');
