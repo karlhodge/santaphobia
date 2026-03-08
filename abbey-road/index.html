@@ -150,7 +150,7 @@ let seated = false;
 let modelReady = false;
 const moveState = { forward: false, backward: false, left: false, right: false };
 const EYE_HEIGHT = 1.7;
-const MOVE_SPEED = 5.0;
+const MOVE_SPEED = 1.5;
 const LOOK_SENS = 0.002;
 const PITCH_LIMIT = 1.2;
 let yaw = 0, pitch = 0;
@@ -632,10 +632,12 @@ async function loadGLTF() {
       teleportPanel.appendChild(btn);
     }
 
-    // ── Spawn camera at redchair1 ──
-    if (landmarks.length > 0) {
-      teleportTo(landmarks[0].pos);
-    }
+    // ── Spawn camera at manually calibrated position ──
+    const SPAWN = { x: -6.043, y: 0.121, z: 9.748 };
+    const SPAWN_YAW = 345 * Math.PI / 180; // 345°
+    camera.position.set(SPAWN.x, SPAWN.y, SPAWN.z);
+    yaw = SPAWN_YAW; pitch = 0;
+    camera.rotation.set(0, yaw, 0);
     console.log('Camera placed at:', camera.position);
 
     // ── Done ──
@@ -684,9 +686,8 @@ function animate() {
       camera.position.add(dir);
     }
 
-    // Vertical movement (Z = up, X = down) — unrestricted for manual calibration
-    if (moveState.up)   camera.position.y += MOVE_SPEED * dt;
-    if (moveState.down) camera.position.y -= MOVE_SPEED * dt;
+    // Lock to calibrated eye height
+    camera.position.y = 0.121;
   }
 
   // Chair raycasting
