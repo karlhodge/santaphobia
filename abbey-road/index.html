@@ -539,6 +539,18 @@ async function loadGLTF() {
       chairPanel.appendChild(btn);
     }
 
+    // ── Position camera inside the model ──
+    box.setFromObject(root);
+    box.getSize(size);
+    const roomCenter = new THREE.Vector3();
+    box.getCenter(roomCenter);
+    // Place at center of room floor at eye height
+    camera.position.set(roomCenter.x, EYE_HEIGHT, roomCenter.z);
+    yaw = 0; pitch = 0;
+    camera.rotation.set(0, 0, 0);
+    console.log('Camera placed at:', camera.position);
+    console.log('Room bounds:', box.min, box.max);
+
     // ── Done ──
     setStatus('Ready');
     modelReady = true;
@@ -549,9 +561,6 @@ async function loadGLTF() {
       console.warn('Note: ' + textureLoadErrors.length + ' textures failed to load. Materials will use base colors instead.');
     }
 
-    // Log scale info
-    box.setFromObject(root);
-    box.getSize(size);
     console.log('Scene dimensions after auto-scale:', size);
     console.log('Scale factor applied:', scaleFactor);
 
