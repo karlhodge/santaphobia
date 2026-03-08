@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abbey Road Studio Two</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#fff}
+canvas{display:block}
+
+/* Overlay */
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;transition:opacity 0.5s}
+#overlay.hidden{opacity:0;pointer-events:none}
+#overlay h1{font-size:3.2rem;font-weight:200;letter-spacing:0.6em;margin-bottom:0.3em;text-transform:uppercase}
+#overlay h2{font-size:1rem;font-weight:300;letter-spacing:0.4em;color:#aaa;margin-bottom:2.5em;text-transform:uppercase}
+#controls-legend{font-size:0.75rem;font-weight:300;letter-spacing:0.15em;color:#888;line-height:2;margin-bottom:2em;text-align:center}
+#controls-legend span{color:#ffcc66}
+#enterBtn{padding:0.8em 2.6em;font-size:0.9rem;font-weight:300;letter-spacing:0.3em;text-transform:uppercase;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.3);cursor:pointer;transition:all 0.3s}
+#enterBtn:hover:not(:disabled){border-color:#ffcc66;color:#ffcc66}
+#enterBtn:disabled{opacity:0.4;cursor:default}
+
+/* Status */
+#status{position:fixed;bottom:16px;left:16px;font-size:0.7rem;font-weight:300;letter-spacing:0.12em;color:#888;z-index:90}
+
+/* Crosshair */
+#crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:80;display:none}
+#crosshair .h,#crosshair .v{position:absolute;background:#fff}
+#crosshair .h{width:20px;height:2px;top:-1px;left:-10px}
+#crosshair .v{width:2px;height:20px;top:-10px;left:-1px}
+
+/* Tooltip */
+#tooltip{position:fixed;top:calc(50% + 30px);left:50%;transform:translateX(-50%);font-size:0.7rem;font-weight:300;letter-spacing:0.15em;color:#ffcc66;pointer-events:none;z-index:80;display:none}
+
+/* Seated UI */
+#seatedUI{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:80;display:none}
+#seatedLabel{font-size:0.8rem;font-weight:300;letter-spacing:0.2em;margin-bottom:1em}
+#standBtn{padding:0.5em 1.6em;font-size:0.75rem;font-weight:300;letter-spacing:0.2em;text-transform:uppercase;background:transparent;color:#ffcc66;border:1px solid rgba(255,204,102,0.4);cursor:pointer;transition:all 0.3s}
+#standBtn:hover{border-color:#ffcc66;background:rgba(255,204,102,0.1)}
+
+/* Chair panel */
+#chairPanel{position:fixed;top:16px;right:16px;background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.1);padding:12px;z-index:80;display:none;max-height:50vh;overflow-y:auto}
+#chairPanel h3{font-size:0.65rem;font-weight:300;letter-spacing:0.2em;text-transform:uppercase;color:#888;margin-bottom:8px}
+#chairPanel button{display:block;width:100%;padding:6px 12px;margin-bottom:4px;font-size:0.7rem;font-weight:300;letter-spacing:0.1em;background:transparent;color:#ccc;border:1px solid rgba(255,255,255,0.08);cursor:pointer;text-align:left;transition:all 0.2s}
+#chairPanel button:hover{border-color:#ffcc66;color:#ffcc66}
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <h1>Abbey Road</h1>
+  <h2>Studio Two &middot; 1966</h2>
+  <div id="controls-legend">
+    <span>W A S D</span> Move &nbsp;&middot;&nbsp; <span>Mouse</span> Look &nbsp;&middot;&nbsp; <span>Click chair</span> Sit &nbsp;&middot;&nbsp; <span>E</span> Stand &nbsp;&middot;&nbsp; <span>Esc</span> Release mouse
+  </div>
+  <button id="enterBtn" disabled>Loading&hellip;</button>
+</div>
+
+<div id="status">Fetching model&hellip;</div>
+
+<div id="crosshair"><div class="h"></div><div class="v"></div></div>
+<div id="tooltip">Click to sit</div>
+
+<div id="seatedUI">
+  <div id="seatedLabel">SEATED &mdash; press E to stand</div>
+  <button id="standBtn">Stand Up</button>
+</div>
+
+<div id="chairPanel">
+  <h3>Chairs</h3>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+'use strict';
+
+// ── DOM refs ──
+const overlay   = document.getElementById('overlay');
+const enterBtn  = document.getElementById('enterBtn');
+const statusEl  = document.getElementById('status');
+const crosshair = document.getElementById('crosshair');
+const tooltipEl = document.getElementById('tooltip');
+const seatedUI  = document.getElementById('seatedUI');
+const standBtn  = document.getElementById('standBtn');
+const chairPanel= document.getElementById('chairPanel');
+
+// ── Renderer ──
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ── Scene ──
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#18140d');
+scene.fog = new THREE.FogExp2(0x18140d, 0.03);
+
+// ── Camera ──
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.05, 200);
+camera.position.set(0, 1.7, 5);
+camera.rotation.order = 'YXZ';
+
+// ── Lighting ──
+scene.add(new THREE.AmbientLight(0xfff0d0, 0.4));
+const hemi = new THREE.HemisphereLight(0xfff8e8, 0x221c10, 0.3);
+scene.add(hemi);
+
+for (let gx = -1; gx <= 1; gx++) {
+  for (let gz = -1; gz <= 1; gz++) {
+    const pl = new THREE.PointLight(0xfffbe8, 1.0, 14);
+    pl.position.set(gx * 4, 4.8, gz * 4);
+    pl.castShadow = true;
+    pl.shadow.mapSize.set(512, 512);
+    scene.add(pl);
+  }
+}
+
+const consolGlow = new THREE.PointLight(0xff7722, 0.5, 8);
+consolGlow.position.set(0, 1.5, -8);
+scene.add(consolGlow);
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── State ──
+let pointerLocked = false;
+let seated = false;
+let modelReady = false;
+const moveState = { forward: false, backward: false, left: false, right: false };
+const EYE_HEIGHT = 1.7;
+const MOVE_SPEED = 5.0;
+const LOOK_SENS = 0.002;
+const PITCH_LIMIT = 1.2;
+let yaw = 0, pitch = 0;
+
+// Chair tracking
+const chairNodes = [];   // { name, group, meshes[] }
+const chairMeshes = [];  // flat list of THREE.Mesh for raycasting
+const originalMaterials = new Map();
+const highlightMat = new THREE.MeshStandardMaterial({ color: 0xffaa33, emissive: 0x441100 });
+let currentHighlight = null;
+
+// ── Pointer Lock ──
+function requestLock() {
+  renderer.domElement.requestPointerLock();
+}
+
+document.addEventListener('pointerlockchange', () => {
+  pointerLocked = document.pointerLockElement === renderer.domElement;
+  if (pointerLocked) {
+    overlay.classList.add('hidden');
+    crosshair.style.display = 'block';
+    chairPanel.style.display = 'block';
+  } else {
+    overlay.classList.remove('hidden');
+    crosshair.style.display = 'none';
+    tooltipEl.style.display = 'none';
+    chairPanel.style.display = 'none';
+    if (seated) standUp();
+  }
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!pointerLocked) return;
+  yaw   -= e.movementX * LOOK_SENS;
+  pitch -= e.movementY * LOOK_SENS;
+  pitch  = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, pitch));
+  camera.rotation.set(pitch, yaw, 0);
+});
+
+// ── Enter button ──
+enterBtn.addEventListener('click', () => {
+  if (!modelReady) return;
+  requestLock();
+});
+
+// ── Keyboard ──
+const keyMap = {
+  KeyW: 'forward', ArrowUp: 'forward',
+  KeyS: 'backward', ArrowDown: 'backward',
+  KeyA: 'left', ArrowLeft: 'left',
+  KeyD: 'right', ArrowRight: 'right',
+};
+
+document.addEventListener('keydown', (e) => {
+  if (keyMap[e.code]) moveState[keyMap[e.code]] = true;
+  if (e.code === 'KeyE' && seated) standUp();
+});
+document.addEventListener('keyup', (e) => {
+  if (keyMap[e.code]) moveState[keyMap[e.code]] = false;
+});
+
+// ── Sit / Stand ──
+function sitOnChair(chairInfo) {
+  const worldPos = new THREE.Vector3();
+  chairInfo.group.getWorldPosition(worldPos);
+  camera.position.set(worldPos.x, worldPos.y + 1.1, worldPos.z);
+  seated = true;
+  seatedUI.style.display = 'block';
+  tooltipEl.style.display = 'none';
+}
+
+function standUp() {
+  seated = false;
+  camera.position.y = EYE_HEIGHT;
+  seatedUI.style.display = 'none';
+}
+
+standBtn.addEventListener('click', standUp);
+
+// ── Click → sit ──
+renderer.domElement.addEventListener('click', () => {
+  if (!pointerLocked) return;
+  if (seated) return;
+  if (currentHighlight) {
+    // Find which chair this mesh belongs to
+    for (const ch of chairNodes) {
+      if (ch.meshes.some(m => m === currentHighlight)) {
+        sitOnChair(ch);
+        break;
+      }
+    }
+  }
+});
+
+// ── Raycaster ──
+const raycaster = new THREE.Raycaster();
+raycaster.far = 6;
+const screenCenter = new THREE.Vector2(0, 0);
+
+// ── Status helper ──
+function setStatus(msg) { statusEl.textContent = msg; }
+
+// =============================================
+// INLINE GLTF PARSER
+// =============================================
+
+async function loadGLTF() {
+  try {
+    setStatus('Fetching model\u2026');
+
+    const gltfResp = await fetch('./scene.gltf');
+    if (!gltfResp.ok) throw new Error('Failed to fetch scene.gltf: ' + gltfResp.status);
+    const gltfArrayBuf = await gltfResp.arrayBuffer();
+
+    // Check for GLB magic
+    const magic = new Uint32Array(gltfArrayBuf, 0, 1)[0];
+    let gltf;
+    let binBuffer;
+
+    if (magic === 0x46546C67) {
+      // GLB
+      const view = new DataView(gltfArrayBuf);
+      const jsonLen = view.getUint32(12, true);
+      const jsonStr = new TextDecoder().decode(new Uint8Array(gltfArrayBuf, 20, jsonLen));
+      gltf = JSON.parse(jsonStr);
+      const binOffset = 20 + jsonLen + 8;
+      binBuffer = gltfArrayBuf.slice(binOffset);
+    } else {
+      const jsonStr = new TextDecoder().decode(gltfArrayBuf);
+      gltf = JSON.parse(jsonStr);
+    }
+
+    setStatus('Parsing\u2026');
+
+    // Load binary buffer
+    const buffers = [];
+    for (const bufDef of gltf.buffers || []) {
+      if (binBuffer && !bufDef.uri) {
+        buffers.push(binBuffer);
+      } else {
+        const resp = await fetch('./' + bufDef.uri);
+        if (!resp.ok) throw new Error('Failed to fetch buffer: ' + bufDef.uri);
+        buffers.push(await resp.arrayBuffer());
+      }
+    }
+
+    // Load textures
+    const textureLoader = new THREE.TextureLoader();
+    const textures = [];
+    const textureLoadErrors = [];
+
+    if (gltf.images) {
+      for (const img of gltf.images) {
+        try {
+          const tex = await new Promise((resolve, reject) => {
+            textureLoader.load('./' + img.uri,
+              (t) => { t.encoding = THREE.sRGBEncoding; resolve(t); },
+              undefined,
+              () => reject(new Error(img.uri))
+            );
+          });
+          textures.push(tex);
+        } catch (err) {
+          textureLoadErrors.push(img.uri);
+          textures.push(null);
+        }
+      }
+    }
+
+    if (textureLoadErrors.length > 0) {
+      console.warn('Textures that failed to load:', textureLoadErrors);
+    }
+
+    // Resolve sampler → texture
+    const gltfTextures = (gltf.textures || []).map(t => {
+      const sourceIdx = t.source;
+      return textures[sourceIdx] || null;
+    });
+
+    setStatus('Building geometry\u2026');
+
+    // ── Helper: get accessor data ──
+    function getAccessorData(accIdx) {
+      const acc = gltf.accessors[accIdx];
+      const bv = gltf.bufferViews[acc.bufferView];
+      const buf = buffers[bv.buffer];
+      const byteOffset = (bv.byteOffset || 0) + (acc.byteOffset || 0);
+      const compSizes = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+      const numComponents = compSizes[acc.type] || 1;
+      const count = acc.count;
+      const stride = bv.byteStride || 0;
+
+      let TypedArray;
+      switch (acc.componentType) {
+        case 5120: TypedArray = Int8Array; break;
+        case 5121: TypedArray = Uint8Array; break;
+        case 5122: TypedArray = Int16Array; break;
+        case 5123: TypedArray = Uint16Array; break;
+        case 5125: TypedArray = Uint32Array; break;
+        case 5126: TypedArray = Float32Array; break;
+        default: TypedArray = Float32Array;
+      }
+
+      if (stride && stride !== numComponents * TypedArray.BYTES_PER_ELEMENT) {
+        // Interleaved: must manually deinterleave
+        const result = new TypedArray(count * numComponents);
+        const srcView = new DataView(buf);
+        for (let i = 0; i < count; i++) {
+          const off = byteOffset + i * stride;
+          for (let j = 0; j < numComponents; j++) {
+            const pos = off + j * TypedArray.BYTES_PER_ELEMENT;
+            if (TypedArray === Float32Array) result[i * numComponents + j] = srcView.getFloat32(pos, true);
+            else if (TypedArray === Uint16Array) result[i * numComponents + j] = srcView.getUint16(pos, true);
+            else if (TypedArray === Uint32Array) result[i * numComponents + j] = srcView.getUint32(pos, true);
+            else result[i * numComponents + j] = srcView.getUint8(pos);
+          }
+        }
+        return { data: result, count, numComponents, componentType: acc.componentType };
+      }
+
+      const data = new TypedArray(buf, byteOffset, count * numComponents);
+      return { data, count, numComponents, componentType: acc.componentType };
+    }
+
+    // ── Build materials ──
+    const materials = (gltf.materials || []).map(matDef => {
+      const params = {};
+      const pbr = matDef.pbrMetallicRoughness || {};
+
+      if (pbr.baseColorFactor) {
+        params.color = new THREE.Color(pbr.baseColorFactor[0], pbr.baseColorFactor[1], pbr.baseColorFactor[2]);
+        if (pbr.baseColorFactor[3] < 1) {
+          params.transparent = true;
+          params.opacity = pbr.baseColorFactor[3];
+        }
+      }
+
+      if (pbr.baseColorTexture && gltfTextures[pbr.baseColorTexture.index]) {
+        params.map = gltfTextures[pbr.baseColorTexture.index];
+      }
+
+      params.metalness = pbr.metallicFactor !== undefined ? pbr.metallicFactor : 0;
+      params.roughness = pbr.roughnessFactor !== undefined ? pbr.roughnessFactor : 1;
+
+      if (matDef.doubleSided) params.side = THREE.DoubleSide;
+
+      const mat = new THREE.MeshStandardMaterial(params);
+      mat.name = matDef.name || '';
+      return mat;
+    });
+
+    // Default material
+    const defaultMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 });
+
+    // ── Build meshes ──
+    function buildMesh(meshIdx) {
+      const meshDef = gltf.meshes[meshIdx];
+      const group = new THREE.Group();
+      group.name = meshDef.name || 'mesh_' + meshIdx;
+
+      for (const prim of meshDef.primitives) {
+        const geom = new THREE.BufferGeometry();
+
+        if (prim.attributes.POSITION !== undefined) {
+          const d = getAccessorData(prim.attributes.POSITION);
+          geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(d.data), 3));
+        }
+
+        if (prim.attributes.NORMAL !== undefined) {
+          const d = getAccessorData(prim.attributes.NORMAL);
+          geom.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(d.data), 3));
+        }
+
+        if (prim.attributes.TEXCOORD_0 !== undefined) {
+          const d = getAccessorData(prim.attributes.TEXCOORD_0);
+          geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(d.data), 2));
+        }
+
+        if (prim.indices !== undefined) {
+          const d = getAccessorData(prim.indices);
+          if (d.componentType === 5125) {
+            geom.setIndex(new THREE.BufferAttribute(new Uint32Array(d.data), 1));
+          } else {
+            geom.setIndex(new THREE.BufferAttribute(new Uint16Array(d.data), 1));
+          }
+        }
+
+        if (!prim.attributes.NORMAL) {
+          geom.computeVertexNormals();
+        }
+
+        const mat = prim.material !== undefined ? materials[prim.material] : defaultMat;
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      }
+
+      return group.children.length === 1 ? group.children[0] : group;
+    }
+
+    // ── Build node tree ──
+    function buildNode(nodeIdx) {
+      const nodeDef = gltf.nodes[nodeIdx];
+      let obj;
+
+      if (nodeDef.mesh !== undefined) {
+        obj = buildMesh(nodeDef.mesh);
+      } else {
+        obj = new THREE.Group();
+      }
+
+      obj.name = nodeDef.name || 'node_' + nodeIdx;
+
+      if (nodeDef.matrix) {
+        const m = new THREE.Matrix4();
+        m.fromArray(nodeDef.matrix);
+        obj.applyMatrix4(m);
+      } else {
+        if (nodeDef.translation) obj.position.fromArray(nodeDef.translation);
+        if (nodeDef.rotation) obj.quaternion.fromArray(nodeDef.rotation);
+        if (nodeDef.scale) obj.scale.fromArray(nodeDef.scale);
+      }
+
+      if (nodeDef.children) {
+        for (const childIdx of nodeDef.children) {
+          obj.add(buildNode(childIdx));
+        }
+      }
+
+      return obj;
+    }
+
+    // Build scene
+    const sceneDef = gltf.scenes[gltf.scene || 0];
+    const root = new THREE.Group();
+    root.name = 'GLTFRoot';
+    for (const nodeIdx of sceneDef.nodes) {
+      root.add(buildNode(nodeIdx));
+    }
+
+    // ── Auto-scale ──
+    const box = new THREE.Box3().setFromObject(root);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxAxis = Math.max(size.x, size.y, size.z);
+    const scaleFactor = 20 / maxAxis;
+    root.scale.multiplyScalar(scaleFactor);
+
+    // Recompute after scale
+    box.setFromObject(root);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    root.position.sub(center);
+
+    // Floor at y=0
+    box.setFromObject(root);
+    root.position.y -= box.min.y;
+
+    scene.add(root);
+
+    // ── Inspect scene graph ──
+    console.group('Scene Graph');
+    const meshNames = [], groupNames = [], lightNames = [];
+    root.traverse(obj => {
+      if (obj.isMesh) meshNames.push(obj.name);
+      else if (obj.isLight) lightNames.push(obj.name);
+      else groupNames.push(obj.name);
+    });
+    console.log('Meshes:', meshNames);
+    console.log('Groups:', groupNames);
+    console.log('Lights:', lightNames);
+    console.groupEnd();
+
+    // ── Detect chairs ──
+    const chairPattern = /chair|seat|stool/i;
+    root.traverse(obj => {
+      if (chairPattern.test(obj.name)) {
+        const info = { name: obj.name, group: obj, meshes: [] };
+        obj.traverse(child => {
+          if (child.isMesh) {
+            info.meshes.push(child);
+            chairMeshes.push(child);
+            originalMaterials.set(child, child.material);
+          }
+        });
+        chairNodes.push(info);
+      }
+    });
+
+    console.log('Chairs found:', chairNodes.length, chairNodes.map(c => c.name));
+
+    // Build chair panel buttons
+    for (const ch of chairNodes) {
+      const btn = document.createElement('button');
+      btn.textContent = ch.name;
+      btn.addEventListener('click', () => sitOnChair(ch));
+      chairPanel.appendChild(btn);
+    }
+
+    // ── Done ──
+    setStatus('Ready');
+    modelReady = true;
+    enterBtn.disabled = false;
+    enterBtn.textContent = 'ENTER STUDIO';
+
+    if (textureLoadErrors.length > 0) {
+      console.warn('Note: ' + textureLoadErrors.length + ' textures failed to load. Materials will use base colors instead.');
+    }
+
+    // Log scale info
+    box.setFromObject(root);
+    box.getSize(size);
+    console.log('Scene dimensions after auto-scale:', size);
+    console.log('Scale factor applied:', scaleFactor);
+
+  } catch (err) {
+    console.error('GLTF load error:', err);
+    setStatus('Error: ' + err.message);
+  }
+}
+
+// ── Animation loop ──
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+
+  // Movement
+  if (pointerLocked && !seated) {
+    const dir = new THREE.Vector3();
+    const front = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    front.y = 0;
+    front.normalize();
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    right.y = 0;
+    right.normalize();
+
+    if (moveState.forward)  dir.add(front);
+    if (moveState.backward) dir.sub(front);
+    if (moveState.right)    dir.add(right);
+    if (moveState.left)     dir.sub(right);
+
+    if (dir.lengthSq() > 0) {
+      dir.normalize().multiplyScalar(MOVE_SPEED * dt);
+      camera.position.add(dir);
+    }
+
+    camera.position.y = EYE_HEIGHT;
+  }
+
+  // Chair raycasting
+  if (pointerLocked && !seated && chairMeshes.length > 0) {
+    raycaster.setFromCamera(screenCenter, camera);
+    const hits = raycaster.intersectObjects(chairMeshes, false);
+
+    // Restore previous highlight
+    if (currentHighlight) {
+      const orig = originalMaterials.get(currentHighlight);
+      if (orig) currentHighlight.material = orig;
+      currentHighlight = null;
+    }
+
+    if (hits.length > 0) {
+      currentHighlight = hits[0].object;
+      currentHighlight.material = highlightMat;
+      tooltipEl.style.display = 'block';
+    } else {
+      tooltipEl.style.display = 'none';
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ── Start ──
+loadGLTF();
+animate();
+
+})();
+</script>
+</body>
+</html>
