@@ -43,6 +43,12 @@ canvas{display:block}
 #chairPanel h3{font-size:0.65rem;font-weight:300;letter-spacing:0.2em;text-transform:uppercase;color:#888;margin-bottom:8px}
 #chairPanel button{display:block;width:100%;padding:6px 12px;margin-bottom:4px;font-size:0.7rem;font-weight:300;letter-spacing:0.1em;background:transparent;color:#ccc;border:1px solid rgba(255,255,255,0.08);cursor:pointer;text-align:left;transition:all 0.2s}
 #chairPanel button:hover{border-color:#ffcc66;color:#ffcc66}
+
+/* Teleport panel */
+#teleportPanel{position:fixed;top:16px;left:16px;background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.1);padding:12px;z-index:80;display:none;max-height:50vh;overflow-y:auto}
+#teleportPanel h3{font-size:0.65rem;font-weight:300;letter-spacing:0.2em;text-transform:uppercase;color:#888;margin-bottom:8px}
+#teleportPanel button{display:block;width:100%;padding:6px 12px;margin-bottom:4px;font-size:0.7rem;font-weight:300;letter-spacing:0.1em;background:transparent;color:#ccc;border:1px solid rgba(255,255,255,0.08);cursor:pointer;text-align:left;transition:all 0.2s}
+#teleportPanel button:hover{border-color:#ffcc66;color:#ffcc66}
 </style>
 </head>
 <body>
@@ -70,6 +76,10 @@ canvas{display:block}
   <h3>Chairs</h3>
 </div>
 
+<div id="teleportPanel">
+  <h3>Teleport</h3>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (function() {
@@ -84,6 +94,7 @@ const tooltipEl = document.getElementById('tooltip');
 const seatedUI  = document.getElementById('seatedUI');
 const standBtn  = document.getElementById('standBtn');
 const chairPanel= document.getElementById('chairPanel');
+const teleportPanel = document.getElementById('teleportPanel');
 
 // ── Renderer ──
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -161,11 +172,13 @@ document.addEventListener('pointerlockchange', () => {
     overlay.classList.add('hidden');
     crosshair.style.display = 'block';
     chairPanel.style.display = 'block';
+    teleportPanel.style.display = 'block';
   } else {
     overlay.classList.remove('hidden');
     crosshair.style.display = 'none';
     tooltipEl.style.display = 'none';
     chairPanel.style.display = 'none';
+    teleportPanel.style.display = 'none';
     if (seated) standUp();
   }
 });
@@ -480,22 +493,14 @@ async function loadGLTF() {
       root.add(buildNode(nodeIdx));
     }
 
-    // ── Fix coordinate system ──
-    // The Sketchfab root matrix bakes in a -90° X rotation (Z-up → Y-up).
-    // Correct it so the floor is horizontal.
-    root.rotation.x = -Math.PI / 2;
-
-    // ── Scale by room height ──
-    // The bounding box Y (after corrective rotation) reflects the true room
-    // height and is NOT polluted by the distant outlier at GLTF Z≈-466.
-    // Scale so room height → 5 Three.js units (≈ 5 m).
+    // ── Auto-scale (simple: fit longest axis to 20 units) ──
     const box = new THREE.Box3().setFromObject(root);
     const size = new THREE.Vector3();
     box.getSize(size);
-    const scaleFactor = 5 / size.y;
+    const maxAxis = Math.max(size.x, size.y, size.z);
+    const scaleFactor = 20 / maxAxis;
     root.scale.multiplyScalar(scaleFactor);
 
-    // No centering — we'll position the camera on a known interior object instead.
     // Floor at y = 0
     box.setFromObject(root);
     root.position.y -= box.min.y;
@@ -541,26 +546,62 @@ async function loadGLTF() {
       chairPanel.appendChild(btn);
     }
 
-    // ── Position camera on a known interior object ──
-    // Using the bounding-box centre fails because distant outlier geometry
-    // skews it far from the actual room. Instead, find a real interior object
-    // (redchair1) and spawn the camera right next to it.
-    let anchor = null;
-    root.traverse(obj => { if (obj.name === 'redchair1') anchor = obj; });
+    // ── Build teleport landmarks from named objects ──
+    // The overall bounding box is useless for camera placement because a distant
+    // outlier at GLTF Z≈-466 puts the centre far outside the room.
+    // Instead, find real interior objects, compute their world-space centres via
+    // Box3.setFromObject (not getWorldPosition, which returns the node origin),
+    // and let the user teleport between them.
     root.updateMatrixWorld(true);
+    const landmarks = [];
+    const landmarkNames = [
+      'redchair1', 'redchair2',
+      'Gubi_G10_Pendant_shade_lamp_light1',
+      'Gubi_G10_Pendant_shade_lamp_light5',
+      'DOOR_FRAME'
+    ];
+    const friendlyNames = {
+      'redchair1': 'Red Chair 1',
+      'redchair2': 'Red Chair 2',
+      'Gubi_G10_Pendant_shade_lamp_light1': 'Lamp 1 (near)',
+      'Gubi_G10_Pendant_shade_lamp_light5': 'Lamp 5 (centre)',
+      'DOOR_FRAME': 'Door'
+    };
+    root.traverse(obj => {
+      if (landmarkNames.includes(obj.name)) {
+        const b = new THREE.Box3().setFromObject(obj);
+        const c = new THREE.Vector3();
+        b.getCenter(c);
+        landmarks.push({ name: obj.name, label: friendlyNames[obj.name] || obj.name, pos: c });
+        console.log('Landmark', obj.name, 'world centre:', c.x.toFixed(3), c.y.toFixed(3), c.z.toFixed(3));
+      }
+    });
 
-    if (anchor) {
-      const anchorPos = new THREE.Vector3();
-      anchor.getWorldPosition(anchorPos);
-      camera.position.set(anchorPos.x, EYE_HEIGHT, anchorPos.z);
-      console.log('Camera anchored to', anchor.name, 'at', anchorPos);
+    // Teleport helper
+    function teleportTo(pos) {
+      camera.position.set(pos.x, EYE_HEIGHT, pos.z);
+      yaw = 0; pitch = 0;
+      camera.rotation.set(0, 0, 0);
+      console.log('Teleported to', pos);
+    }
+
+    // Build teleport panel buttons
+    for (const lm of landmarks) {
+      const btn = document.createElement('button');
+      btn.textContent = lm.label;
+      btn.addEventListener('click', () => teleportTo(lm.pos));
+      teleportPanel.appendChild(btn);
+    }
+
+    // ── Spawn camera at first landmark (or fallback) ──
+    if (landmarks.length > 0) {
+      teleportTo(landmarks[0].pos);
     } else {
-      // Fallback: use bounding-box centre (better than nothing)
+      // Last resort: box centre
       const roomCenter = new THREE.Vector3();
       box.setFromObject(root);
       box.getCenter(roomCenter);
       camera.position.set(roomCenter.x, EYE_HEIGHT, roomCenter.z);
-      console.log('No anchor found, camera at box centre:', roomCenter);
     }
     yaw = 0; pitch = 0;
     camera.rotation.set(0, 0, 0);
