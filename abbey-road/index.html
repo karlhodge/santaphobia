@@ -57,12 +57,13 @@ canvas{display:block}
   <h1>Abbey Road</h1>
   <h2>Studio Two &middot; 1966</h2>
   <div id="controls-legend">
-    <span>W A S D</span> Move &nbsp;&middot;&nbsp; <span>Mouse</span> Look &nbsp;&middot;&nbsp; <span>1-5</span> Teleport &nbsp;&middot;&nbsp; <span>Click chair</span> Sit &nbsp;&middot;&nbsp; <span>E</span> Stand &nbsp;&middot;&nbsp; <span>Esc</span> Release mouse
+    <span>W A S D</span> Move &nbsp;&middot;&nbsp; <span>Z / X</span> Up / Down &nbsp;&middot;&nbsp; <span>Mouse</span> Look &nbsp;&middot;&nbsp; <span>1-5</span> Teleport &nbsp;&middot;&nbsp; <span>Click chair</span> Sit &nbsp;&middot;&nbsp; <span>E</span> Stand &nbsp;&middot;&nbsp; <span>Esc</span> Release mouse
   </div>
   <button id="enterBtn" disabled>Loading&hellip;</button>
 </div>
 
 <div id="status">Fetching model&hellip;</div>
+<div id="coordHUD" style="position:fixed;top:12px;right:12px;font-family:monospace;font-size:0.8rem;color:#0f0;background:rgba(0,0,0,0.6);padding:8px 12px;border-radius:4px;z-index:90;display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
 
 <div id="crosshair"><div class="h"></div><div class="v"></div></div>
 <div id="tooltip">Click to sit</div>
@@ -207,6 +208,8 @@ const keyMap = {
   KeyS: 'backward', ArrowDown: 'backward',
   KeyA: 'left', ArrowLeft: 'left',
   KeyD: 'right', ArrowRight: 'right',
+  KeyZ: 'up',
+  KeyX: 'down',
 };
 
 document.addEventListener('keydown', (e) => {
@@ -681,7 +684,9 @@ function animate() {
       camera.position.add(dir);
     }
 
-    camera.position.y = EYE_HEIGHT;
+    // Vertical movement (Z = up, X = down) — unrestricted for manual calibration
+    if (moveState.up)   camera.position.y += MOVE_SPEED * dt;
+    if (moveState.down) camera.position.y -= MOVE_SPEED * dt;
   }
 
   // Chair raycasting
@@ -703,6 +708,19 @@ function animate() {
     } else {
       tooltipEl.style.display = 'none';
     }
+  }
+
+  // Live coordinate HUD
+  const hud = document.getElementById('coordHUD');
+  if (pointerLocked && hud) {
+    hud.style.display = 'block';
+    hud.textContent =
+      `X: ${camera.position.x.toFixed(3)}\n` +
+      `Y: ${camera.position.y.toFixed(3)}\n` +
+      `Z: ${camera.position.z.toFixed(3)}\n` +
+      `Yaw: ${(yaw * 180 / Math.PI).toFixed(1)}°`;
+  } else if (hud) {
+    hud.style.display = 'none';
   }
 
   renderer.render(scene, camera);
