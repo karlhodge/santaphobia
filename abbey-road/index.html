@@ -150,7 +150,7 @@ let seated = false;
 let modelReady = false;
 const moveState = { forward: false, backward: false, left: false, right: false };
 const EYE_HEIGHT = 1.7;
-const MOVE_SPEED = 1.5;
+const MOVE_SPEED = 0.8;
 const LOOK_SENS = 0.002;
 const PITCH_LIMIT = 1.2;
 let yaw = 0, pitch = 0;
@@ -161,6 +161,10 @@ const chairMeshes = [];  // flat list of THREE.Mesh for raycasting
 const originalMaterials = new Map();
 const highlightMat = new THREE.MeshStandardMaterial({ color: 0xffaa33, emissive: 0x441100 });
 let currentHighlight = null;
+
+// Collision detection
+const collisionMeshes = [];  // meshes to collide against (walls, floor, furniture)
+const COLLISION_DISTANCE = 0.35; // how close we can get to walls
 
 // Teleport state (populated after model loads)
 let landmarks = [];
@@ -338,6 +342,14 @@ async function loadGLTF() {
 
     if (textureLoadErrors.length > 0) {
       console.warn('Textures that failed to load:', textureLoadErrors);
+    }
+
+    // Ensure all textures tile properly
+    for (const tex of textures) {
+      if (tex) {
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+      }
     }
 
     // Resolve sampler → texture
@@ -586,6 +598,14 @@ async function loadGLTF() {
 
     console.log('Chairs found:', chairNodes.length, chairNodes.map(c => c.name));
 
+    // ── Collect collision meshes (all meshes except chairs) ──
+    root.traverse(obj => {
+      if (obj.isMesh && !chairMeshes.includes(obj)) {
+        collisionMeshes.push(obj);
+      }
+    });
+    console.log('Collision meshes:', collisionMeshes.length);
+
     // Build chair panel buttons
     for (const ch of chairNodes) {
       const btn = document.createElement('button');
@@ -666,7 +686,7 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = clock.getDelta();
 
-  // Movement
+  // Movement with collision detection
   if (pointerLocked && !seated) {
     const dir = new THREE.Vector3();
     const front = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
@@ -682,8 +702,34 @@ function animate() {
     if (moveState.left)     dir.sub(right);
 
     if (dir.lengthSq() > 0) {
-      dir.normalize().multiplyScalar(MOVE_SPEED * dt);
-      camera.position.add(dir);
+      dir.normalize();
+      const step = MOVE_SPEED * dt;
+      const newPos = camera.position.clone().add(dir.clone().multiplyScalar(step));
+      newPos.y = 0.121;
+
+      // Cast rays from player position in movement direction to detect walls
+      const collisionRay = new THREE.Raycaster();
+      const playerOrigin = camera.position.clone();
+      playerOrigin.y = 0.5; // cast from mid-body height
+
+      // Check multiple ray heights for better wall detection
+      let blocked = false;
+      const rayHeights = [0.3, 0.8, 1.4];
+      for (const rh of rayHeights) {
+        if (blocked) break;
+        const origin = camera.position.clone();
+        origin.y = rh;
+        collisionRay.set(origin, dir);
+        collisionRay.far = COLLISION_DISTANCE + step;
+        const hits = collisionRay.intersectObjects(collisionMeshes, false);
+        if (hits.length > 0 && hits[0].distance < COLLISION_DISTANCE + step) {
+          blocked = true;
+        }
+      }
+
+      if (!blocked) {
+        camera.position.copy(newPos);
+      }
     }
 
     // Lock to calibrated eye height
