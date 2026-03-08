@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Scene</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#fff}
+canvas{display:block}
+
+/* Full-screen entry overlay with title, controls legend, and enter button */
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,0.88);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;transition:opacity 0.5s}
+#overlay.hidden{opacity:0;pointer-events:none}
+#overlay h1{font-size:3.2rem;font-weight:200;letter-spacing:0.6em;margin-bottom:0.3em;text-transform:uppercase}
+#overlay h2{font-size:1rem;font-weight:300;letter-spacing:0.4em;color:#aaa;margin-bottom:2.5em;text-transform:uppercase}
+#controls-legend{font-size:0.75rem;font-weight:300;letter-spacing:0.15em;color:#888;line-height:2;margin-bottom:2em;text-align:center}
+#controls-legend span{color:#ffcc66}
+#enterBtn{padding:0.8em 2.6em;font-size:0.9rem;font-weight:300;letter-spacing:0.3em;text-transform:uppercase;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.3);cursor:pointer;transition:all 0.3s}
+#enterBtn:hover:not(:disabled){border-color:#ffcc66;color:#ffcc66}
+#enterBtn:disabled{opacity:0.4;cursor:default}
+
+/* Loading/ready status text in bottom-left corner */
+#status{position:fixed;bottom:16px;left:16px;font-size:0.7rem;font-weight:300;letter-spacing:0.12em;color:#888;z-index:90}
+
+/* Centre-screen crosshair shown during pointer lock */
+#crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:80;display:none}
+#crosshair .h,#crosshair .v{position:absolute;background:#fff}
+#crosshair .h{width:20px;height:2px;top:-1px;left:-10px}
+#crosshair .v{width:2px;height:20px;top:-10px;left:-1px}
+</style>
+</head>
+<body>
+
+<!-- Entry overlay — hidden once pointer lock is acquired -->
+<div id="overlay">
+  <h1 id="scene-title"></h1>
+  <h2 id="scene-subtitle"></h2>
+  <div id="controls-legend">
+    <span>W A S D</span> Move &nbsp;&middot;&nbsp; <span>Mouse</span> Look &nbsp;&middot;&nbsp; <span>Esc</span> Release mouse
+  </div>
+  <button id="enterBtn" disabled>Loading&hellip;</button>
+</div>
+
+<!-- Status text updates during model loading -->
+<div id="status">Fetching model&hellip;</div>
+
+<!-- Debug HUD showing live camera coordinates (top-right, visible during pointer lock) -->
+<div id="coordHUD" style="position:fixed;top:12px;right:12px;font-family:monospace;font-size:0.8rem;color:#0f0;background:rgba(0,0,0,0.6);padding:8px 12px;border-radius:4px;z-index:90;display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
+
+<!-- Crosshair rendered at screen centre during first-person navigation -->
+<div id="crosshair"><div class="h"></div><div class="v"></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+'use strict';
+
+// =============================================
+// CONFIG — Edit these values for each new scene
+// =============================================
+const CONFIG = {
+  // Scene identity
+  TITLE: 'Scene Title',               // Main heading on entry overlay
+  SUBTITLE: 'Subtitle',               // Secondary text (set '' to hide)
+  ENTER_TEXT: 'ENTER',                 // Button label when ready
+
+  // Model file (relative path to .gltf or .glb)
+  MODEL_FILE: './scene.gltf',
+
+  // Spawn point — calibrate using the coordinate HUD or a SpawnPoint marker
+  SPAWN_X: 0,
+  SPAWN_Z: 0,
+  SPAWN_YAW_DEG: 0,                   // Compass heading in degrees
+  USE_SPAWN_MARKER: false,            // If true, look for an object named "SpawnPoint"
+
+  // Player
+  EYE_HEIGHT: 1.6,                    // Camera Y position (metres above floor)
+  MOVE_SPEED: 2.0,                    // Walking speed (units/second)
+  LOOK_SENSITIVITY: 0.002,            // Mouse look (radians per pixel)
+  PITCH_LIMIT: 1.2,                   // Max vertical look angle (~69 degrees)
+  COLLISION_DISTANCE: 0.3,            // Min distance from walls before blocking
+
+  // Scene scaling — model's longest axis is normalised to this many units
+  ROOM_SCALE: 20,
+
+  // Anchor object for bounding-box calculation (filters outlier geometry).
+  // Set to '' to use the full model bounds, or name a known interior object.
+  ANCHOR_OBJECT: '',
+
+  // Lighting
+  AMBIENT_COLOR: 0xfff0d0,
+  AMBIENT_INTENSITY: 0.4,
+  HEMI_SKY_COLOR: 0xfff8e8,
+  HEMI_GROUND_COLOR: 0x221c10,
+  HEMI_INTENSITY: 0.3,
+  POINT_LIGHT_COLOR: 0xfffbe8,
+  POINT_LIGHT_INTENSITY: 1.0,
+  POINT_LIGHT_RANGE: 14,
+  POINT_LIGHT_GRID: 1,                // NxN grid: 0=off, 1=3x3, 2=5x5
+  POINT_LIGHT_HEIGHT: 4.8,
+  POINT_LIGHT_SPACING: 4,
+
+  // Background and fog
+  BG_COLOR: '#18140d',
+  FOG_DENSITY: 0.03,
+
+  // Debug
+  SHOW_COORD_HUD: true,               // Set false to hide the green XYZ overlay
+};
+
+// ── Apply config to DOM ──
+document.title = CONFIG.TITLE;
+document.getElementById('scene-title').textContent = CONFIG.TITLE;
+const subtitleEl = document.getElementById('scene-subtitle');
+if (CONFIG.SUBTITLE) {
+  subtitleEl.textContent = CONFIG.SUBTITLE;
+} else {
+  subtitleEl.style.display = 'none';
+}
+
+// ── Cached DOM references ──
+const overlay   = document.getElementById('overlay');
+const enterBtn  = document.getElementById('enterBtn');
+const statusEl  = document.getElementById('status');
+const crosshair = document.getElementById('crosshair');
+const coordHUD  = document.getElementById('coordHUD');
+
+// ── Three.js renderer with physically-based lighting ──
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ── Scene with configurable background and distance fog ──
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(CONFIG.BG_COLOR);
+scene.fog = new THREE.FogExp2(new THREE.Color(CONFIG.BG_COLOR).getHex(), CONFIG.FOG_DENSITY);
+
+// ── First-person camera ──
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.05, 200);
+camera.rotation.order = 'YXZ'; // Allows independent yaw (Y) and pitch (X) rotation
+
+// ── Lighting ──
+scene.add(new THREE.AmbientLight(CONFIG.AMBIENT_COLOR, CONFIG.AMBIENT_INTENSITY));
+scene.add(new THREE.HemisphereLight(CONFIG.HEMI_SKY_COLOR, CONFIG.HEMI_GROUND_COLOR, CONFIG.HEMI_INTENSITY));
+
+// Grid of ceiling point lights for even illumination
+const gridN = CONFIG.POINT_LIGHT_GRID;
+if (gridN >= 0) {
+  for (let gx = -gridN; gx <= gridN; gx++) {
+    for (let gz = -gridN; gz <= gridN; gz++) {
+      const pl = new THREE.PointLight(CONFIG.POINT_LIGHT_COLOR, CONFIG.POINT_LIGHT_INTENSITY, CONFIG.POINT_LIGHT_RANGE);
+      pl.position.set(gx * CONFIG.POINT_LIGHT_SPACING, CONFIG.POINT_LIGHT_HEIGHT, gz * CONFIG.POINT_LIGHT_SPACING);
+      pl.castShadow = true;
+      pl.shadow.mapSize.set(512, 512);
+      scene.add(pl);
+    }
+  }
+}
+
+// ── Responsive canvas resize ──
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ── Player state ──
+let pointerLocked = false;
+let modelReady = false;
+const moveState = { forward: false, backward: false, left: false, right: false };
+let yaw = 0, pitch = 0;
+
+// All scene meshes used for wall/obstacle collision raycasting
+const collisionMeshes = [];
+const collisionRay = new THREE.Raycaster();
+
+// ── Pointer lock controls ──
+document.addEventListener('pointerlockchange', () => {
+  pointerLocked = document.pointerLockElement === renderer.domElement;
+  if (pointerLocked) {
+    overlay.classList.add('hidden');
+    crosshair.style.display = 'block';
+  } else {
+    overlay.classList.remove('hidden');
+    crosshair.style.display = 'none';
+  }
+});
+
+// First-person mouse look: yaw (left/right) and pitch (up/down) with clamping
+document.addEventListener('mousemove', (e) => {
+  if (!pointerLocked) return;
+  yaw   -= e.movementX * CONFIG.LOOK_SENSITIVITY;
+  pitch -= e.movementY * CONFIG.LOOK_SENSITIVITY;
+  pitch  = Math.max(-CONFIG.PITCH_LIMIT, Math.min(CONFIG.PITCH_LIMIT, pitch));
+  camera.rotation.set(pitch, yaw, 0);
+});
+
+// Enter button requests pointer lock to begin first-person navigation
+enterBtn.addEventListener('click', () => {
+  if (modelReady) renderer.domElement.requestPointerLock();
+});
+
+// ── WASD keyboard input ──
+const keyMap = {
+  KeyW: 'forward', ArrowUp: 'forward',
+  KeyS: 'backward', ArrowDown: 'backward',
+  KeyA: 'left', ArrowLeft: 'left',
+  KeyD: 'right', ArrowRight: 'right',
+};
+document.addEventListener('keydown', (e) => {
+  if (keyMap[e.code]) moveState[keyMap[e.code]] = true;
+});
+document.addEventListener('keyup', (e) => {
+  if (keyMap[e.code]) moveState[keyMap[e.code]] = false;
+});
+
+function setStatus(msg) { statusEl.textContent = msg; }
+
+// =============================================
+// GLTF/GLB LOADER
+// Parses .gltf/.glb files without external loader
+// libraries, building Three.js geometry, materials,
+// and the scene node hierarchy directly.
+// =============================================
+
+async function loadGLTF() {
+  try {
+    setStatus('Fetching model\u2026');
+
+    const gltfResp = await fetch(CONFIG.MODEL_FILE);
+    if (!gltfResp.ok) throw new Error('Failed to fetch model: ' + gltfResp.status);
+    const gltfArrayBuf = await gltfResp.arrayBuffer();
+
+    // Detect binary GLB format via magic number (0x46546C67 = "glTF")
+    const magic = new Uint32Array(gltfArrayBuf, 0, 1)[0];
+    let gltf;
+    let binBuffer;
+
+    if (magic === 0x46546C67) {
+      // GLB: JSON chunk starts at byte 20, binary chunk follows
+      const view = new DataView(gltfArrayBuf);
+      const jsonLen = view.getUint32(12, true);
+      const jsonStr = new TextDecoder().decode(new Uint8Array(gltfArrayBuf, 20, jsonLen));
+      gltf = JSON.parse(jsonStr);
+      const binOffset = 20 + jsonLen + 8;
+      binBuffer = gltfArrayBuf.slice(binOffset);
+    } else {
+      // Plain JSON .gltf — binary data loaded separately via buffer URIs
+      const jsonStr = new TextDecoder().decode(gltfArrayBuf);
+      gltf = JSON.parse(jsonStr);
+    }
+
+    setStatus('Parsing\u2026');
+
+    // ── Load binary geometry buffers ──
+    const buffers = [];
+    for (const bufDef of gltf.buffers || []) {
+      if (binBuffer && !bufDef.uri) {
+        buffers.push(binBuffer);
+      } else {
+        const resp = await fetch('./' + bufDef.uri);
+        if (!resp.ok) throw new Error('Failed to fetch buffer: ' + bufDef.uri);
+        buffers.push(await resp.arrayBuffer());
+      }
+    }
+
+    // ── Load texture images ──
+    const textureLoader = new THREE.TextureLoader();
+    const textures = [];
+    const textureLoadErrors = [];
+
+    if (gltf.images) {
+      for (const img of gltf.images) {
+        try {
+          const tex = await new Promise((resolve, reject) => {
+            textureLoader.load('./' + img.uri,
+              (t) => { t.encoding = THREE.sRGBEncoding; resolve(t); },
+              undefined,
+              () => reject(new Error(img.uri))
+            );
+          });
+          textures.push(tex);
+        } catch (err) {
+          textureLoadErrors.push(img.uri);
+          textures.push(null);
+        }
+      }
+    }
+
+    if (textureLoadErrors.length > 0) {
+      console.warn('Textures that failed to load:', textureLoadErrors);
+    }
+
+    // Enable seamless tiling on all textures
+    for (const tex of textures) {
+      if (tex) {
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+      }
+    }
+
+    const gltfTextures = (gltf.textures || []).map(t => textures[t.source] || null);
+
+    setStatus('Building geometry\u2026');
+
+    // ── Accessor data extraction ──
+    function getAccessorData(accIdx) {
+      const acc = gltf.accessors[accIdx];
+      const bv = gltf.bufferViews[acc.bufferView];
+      const buf = buffers[bv.buffer];
+      const byteOffset = (bv.byteOffset || 0) + (acc.byteOffset || 0);
+      const compSizes = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 };
+      const numComponents = compSizes[acc.type] || 1;
+      const count = acc.count;
+      const stride = bv.byteStride || 0;
+
+      let TypedArray;
+      switch (acc.componentType) {
+        case 5120: TypedArray = Int8Array; break;
+        case 5121: TypedArray = Uint8Array; break;
+        case 5122: TypedArray = Int16Array; break;
+        case 5123: TypedArray = Uint16Array; break;
+        case 5125: TypedArray = Uint32Array; break;
+        case 5126: TypedArray = Float32Array; break;
+        default: TypedArray = Float32Array;
+      }
+
+      if (stride && stride !== numComponents * TypedArray.BYTES_PER_ELEMENT) {
+        const result = new TypedArray(count * numComponents);
+        const srcView = new DataView(buf);
+        for (let i = 0; i < count; i++) {
+          const off = byteOffset + i * stride;
+          for (let j = 0; j < numComponents; j++) {
+            const pos = off + j * TypedArray.BYTES_PER_ELEMENT;
+            if (TypedArray === Float32Array) result[i * numComponents + j] = srcView.getFloat32(pos, true);
+            else if (TypedArray === Uint16Array) result[i * numComponents + j] = srcView.getUint16(pos, true);
+            else if (TypedArray === Uint32Array) result[i * numComponents + j] = srcView.getUint32(pos, true);
+            else result[i * numComponents + j] = srcView.getUint8(pos);
+          }
+        }
+        return { data: result, count, numComponents, componentType: acc.componentType };
+      }
+
+      const data = new TypedArray(buf, byteOffset, count * numComponents);
+      return { data, count, numComponents, componentType: acc.componentType };
+    }
+
+    // ── PBR material construction ──
+    const materials = (gltf.materials || []).map(matDef => {
+      const params = {};
+      const pbr = matDef.pbrMetallicRoughness || {};
+
+      if (pbr.baseColorFactor) {
+        params.color = new THREE.Color(pbr.baseColorFactor[0], pbr.baseColorFactor[1], pbr.baseColorFactor[2]);
+        if (pbr.baseColorFactor[3] < 1) {
+          params.transparent = true;
+          params.opacity = pbr.baseColorFactor[3];
+        }
+      }
+
+      if (pbr.baseColorTexture && gltfTextures[pbr.baseColorTexture.index]) {
+        params.map = gltfTextures[pbr.baseColorTexture.index];
+      }
+
+      params.metalness = pbr.metallicFactor !== undefined ? pbr.metallicFactor : 0;
+      params.roughness = pbr.roughnessFactor !== undefined ? pbr.roughnessFactor : 1;
+      if (matDef.doubleSided) params.side = THREE.DoubleSide;
+
+      const mat = new THREE.MeshStandardMaterial(params);
+      mat.name = matDef.name || '';
+      return mat;
+    });
+
+    const defaultMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8 });
+
+    // ── Mesh builder ──
+    function buildMesh(meshIdx) {
+      const meshDef = gltf.meshes[meshIdx];
+      const group = new THREE.Group();
+      group.name = meshDef.name || 'mesh_' + meshIdx;
+
+      for (const prim of meshDef.primitives) {
+        const geom = new THREE.BufferGeometry();
+
+        if (prim.attributes.POSITION !== undefined) {
+          const d = getAccessorData(prim.attributes.POSITION);
+          geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(d.data), 3));
+        }
+        if (prim.attributes.NORMAL !== undefined) {
+          const d = getAccessorData(prim.attributes.NORMAL);
+          geom.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(d.data), 3));
+        }
+        if (prim.attributes.TEXCOORD_0 !== undefined) {
+          const d = getAccessorData(prim.attributes.TEXCOORD_0);
+          geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(d.data), 2));
+        }
+        if (prim.indices !== undefined) {
+          const d = getAccessorData(prim.indices);
+          const IndexArray = d.componentType === 5125 ? Uint32Array : Uint16Array;
+          geom.setIndex(new THREE.BufferAttribute(new IndexArray(d.data), 1));
+        }
+
+        if (!prim.attributes.NORMAL) geom.computeVertexNormals();
+
+        const mat = prim.material !== undefined ? materials[prim.material] : defaultMat;
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        group.add(mesh);
+      }
+
+      return group.children.length === 1 ? group.children[0] : group;
+    }
+
+    // ── Node tree builder ──
+    function buildNode(nodeIdx) {
+      const nodeDef = gltf.nodes[nodeIdx];
+      const obj = nodeDef.mesh !== undefined ? buildMesh(nodeDef.mesh) : new THREE.Group();
+      obj.name = nodeDef.name || 'node_' + nodeIdx;
+
+      if (nodeDef.matrix) {
+        obj.applyMatrix4(new THREE.Matrix4().fromArray(nodeDef.matrix));
+      } else {
+        if (nodeDef.translation) obj.position.fromArray(nodeDef.translation);
+        if (nodeDef.rotation) obj.quaternion.fromArray(nodeDef.rotation);
+        if (nodeDef.scale) obj.scale.fromArray(nodeDef.scale);
+      }
+
+      if (nodeDef.children) {
+        for (const childIdx of nodeDef.children) obj.add(buildNode(childIdx));
+      }
+
+      return obj;
+    }
+
+    // ── Assemble the GLTF scene into Three.js ──
+    const sceneDef = gltf.scenes[gltf.scene || 0];
+    const root = new THREE.Group();
+    root.name = 'GLTFRoot';
+    for (const nodeIdx of sceneDef.nodes) root.add(buildNode(nodeIdx));
+
+    scene.add(root);
+    root.updateMatrixWorld(true);
+
+    // ── Scale and centre the model ──
+    // If ANCHOR_OBJECT is set, only include nearby meshes in the bounding box
+    // to filter outlier geometry that would inflate the bounds.
+    let anchorPos = new THREE.Vector3();
+    if (CONFIG.ANCHOR_OBJECT) {
+      let anchorNode = null;
+      root.traverse(obj => { if (obj.name === CONFIG.ANCHOR_OBJECT) anchorNode = obj; });
+      if (anchorNode) {
+        new THREE.Box3().setFromObject(anchorNode).getCenter(anchorPos);
+      }
+    }
+
+    const roomBox = new THREE.Box3();
+    root.traverse(obj => {
+      if (obj.isMesh) {
+        const mb = new THREE.Box3().setFromObject(obj);
+        if (CONFIG.ANCHOR_OBJECT) {
+          const mc = new THREE.Vector3();
+          mb.getCenter(mc);
+          if (mc.distanceTo(anchorPos) < 2000) roomBox.union(mb);
+        } else {
+          roomBox.union(mb);
+        }
+      }
+    });
+    const roomSize = new THREE.Vector3();
+    roomBox.getSize(roomSize);
+    const roomCentre = new THREE.Vector3();
+    roomBox.getCenter(roomCentre);
+
+    const scaleFactor = CONFIG.ROOM_SCALE / Math.max(roomSize.x, roomSize.y, roomSize.z);
+    root.scale.multiplyScalar(scaleFactor);
+
+    root.position.set(
+      -roomCentre.x * scaleFactor,
+      -roomBox.min.y * scaleFactor,
+      -roomCentre.z * scaleFactor
+    );
+    root.updateMatrixWorld(true);
+
+    // ── Collect all meshes for collision detection ──
+    root.traverse(obj => {
+      if (obj.isMesh) collisionMeshes.push(obj);
+    });
+
+    // ── Place camera at spawn point ──
+    if (CONFIG.USE_SPAWN_MARKER) {
+      // Look for an object named "SpawnPoint" in the loaded scene
+      let spawnObj = null;
+      root.traverse(obj => { if (obj.name === 'SpawnPoint') spawnObj = obj; });
+      if (spawnObj) {
+        const wp = new THREE.Vector3();
+        spawnObj.getWorldPosition(wp);
+        camera.position.set(wp.x, CONFIG.EYE_HEIGHT, wp.z);
+      } else {
+        console.warn('SpawnPoint marker not found — using CONFIG coordinates');
+        camera.position.set(CONFIG.SPAWN_X, CONFIG.EYE_HEIGHT, CONFIG.SPAWN_Z);
+      }
+    } else {
+      camera.position.set(CONFIG.SPAWN_X, CONFIG.EYE_HEIGHT, CONFIG.SPAWN_Z);
+    }
+
+    yaw = CONFIG.SPAWN_YAW_DEG * Math.PI / 180;
+    pitch = 0;
+    camera.rotation.set(0, yaw, 0);
+
+    // ── Model loaded — enable the enter button ──
+    setStatus('Ready');
+    modelReady = true;
+    enterBtn.disabled = false;
+    enterBtn.textContent = CONFIG.ENTER_TEXT;
+
+    if (textureLoadErrors.length > 0) {
+      console.warn('Note: ' + textureLoadErrors.length + ' textures failed to load. Materials will use base colors instead.');
+    }
+
+  } catch (err) {
+    console.error('GLTF load error:', err);
+    setStatus('Error: ' + err.message);
+  }
+}
+
+// ── Main render loop ──
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+
+  if (pointerLocked) {
+    const dir = new THREE.Vector3();
+    const front = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    front.y = 0;
+    front.normalize();
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+    right.y = 0;
+    right.normalize();
+
+    if (moveState.forward)  dir.add(front);
+    if (moveState.backward) dir.sub(front);
+    if (moveState.right)    dir.add(right);
+    if (moveState.left)     dir.sub(right);
+
+    if (dir.lengthSq() > 0) {
+      dir.normalize();
+      const step = CONFIG.MOVE_SPEED * dt;
+
+      // Cast rays at three body heights to prevent walking through walls
+      let blocked = false;
+      const rayHeights = [0.3, 0.8, 1.4];
+      for (let i = 0; i < rayHeights.length && !blocked; i++) {
+        const origin = camera.position.clone();
+        origin.y = rayHeights[i];
+        collisionRay.set(origin, dir);
+        collisionRay.far = CONFIG.COLLISION_DISTANCE + step;
+        const hits = collisionRay.intersectObjects(collisionMeshes, false);
+        if (hits.length > 0 && hits[0].distance < CONFIG.COLLISION_DISTANCE + step) {
+          blocked = true;
+        }
+      }
+
+      if (!blocked) {
+        camera.position.addScaledVector(dir, step);
+      }
+    }
+
+    camera.position.y = CONFIG.EYE_HEIGHT;
+
+    // Debug coordinate HUD
+    if (CONFIG.SHOW_COORD_HUD) {
+      coordHUD.style.display = 'block';
+      coordHUD.textContent =
+        `X: ${camera.position.x.toFixed(3)}\n` +
+        `Y: ${camera.position.y.toFixed(3)}\n` +
+        `Z: ${camera.position.z.toFixed(3)}\n` +
+        `Yaw: ${(yaw * 180 / Math.PI).toFixed(1)}\u00B0`;
+    }
+  } else {
+    coordHUD.style.display = 'none';
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ── Bootstrap ──
+loadGLTF();
+animate();
+
+})();
+</script>
+</body>
+</html>
