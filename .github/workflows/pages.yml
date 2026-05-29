@@ -1,0 +1,51 @@
+name: Deploy gallery to GitHub Pages
+
+# Publishes the static A-Frame gallery whenever the site (or the images)
+# change. The whole repo root is the site — there is no build step.
+on:
+  push:
+    branches:
+      - main
+      - claude/blissful-dijkstra-dgYZd
+  workflow_dispatch:
+
+# Allow this workflow to publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let an in-progress run finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Warn if images are missing
+        run: |
+          count=$(find images -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \) | wc -l)
+          echo "Found $count image file(s) in images/"
+          if [ "$count" -eq 0 ]; then
+            echo "::warning::No images committed yet — the gallery will deploy but frames will be blank until you add the 66 photos listed in images/MANIFEST.txt"
+          fi
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

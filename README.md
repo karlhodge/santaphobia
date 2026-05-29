@@ -36,12 +36,15 @@ button (bottom-right) for VR.
 
 ## Publish it online
 
-**GitHub Pages** (simplest):
+**GitHub Pages (automatic):** this repo ships a workflow
+([`.github/workflows/pages.yml`](.github/workflows/pages.yml)) that deploys the
+site on every push to `main` or the working branch. One-time setup:
 
-1. Commit the `images/` folder.
-2. Repo **Settings → Pages → Build and deployment → Deploy from a branch**, and
-   pick this branch with folder `/ (root)`.
-3. Your gallery goes live at `https://<user>.github.io/santaphobia/`.
+1. Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+2. Commit the photos into `images/` and push.
+3. The workflow runs and publishes to `https://<user>.github.io/santaphobia/`.
+   (It deploys even before images are added, logging a warning if the folder is
+   empty.) You can also trigger it manually from the **Actions** tab.
 
 **Netlify / Vercel / any static host:** drag-and-drop the folder, or point it at
 this repo. No build step is required — it's plain static files.
