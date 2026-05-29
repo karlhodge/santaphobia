@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>Santaphobia — 3D Gallery</title>
+    <meta name="description" content="A walkable recreation of the Santaphobia gallery, rebuilt from its Spatial scene export." />
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="gallery-data.js"></script>
+    <style>
+      html, body { margin: 0; height: 100%; background: #111; font-family: system-ui, sans-serif; }
+      #intro {
+        position: fixed; z-index: 10; left: 50%; top: 18px; transform: translateX(-50%);
+        background: rgba(0,0,0,0.65); color: #fff; padding: 10px 16px; border-radius: 8px;
+        font-size: 14px; line-height: 1.5; max-width: 92vw; text-align: center;
+        pointer-events: none; transition: opacity 0.6s; backdrop-filter: blur(4px);
+      }
+      #intro b { color: #ffd27f; }
+      #intro.hide { opacity: 0; }
+      #count { position: fixed; z-index: 10; left: 12px; bottom: 10px; color: #aaa; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <div id="intro">
+      <b>Drag</b> to look · <b>W A S D</b> / arrows to walk · headset button for VR
+    </div>
+    <div id="count"></div>
+
+    <a-scene gallery background="color: #1a1a1f" fog="type: linear; color: #1a1a1f; near: 35; far: 95" renderer="colorManagement: true; antialias: true">
+      <!-- Lighting -->
+      <a-entity light="type: ambient; color: #cfd3da; intensity: 0.85"></a-entity>
+      <a-entity light="type: directional; color: #ffffff; intensity: 0.6; castShadow: false" position="10 25 5"></a-entity>
+      <a-entity light="type: directional; color: #ffffff; intensity: 0.35" position="-15 20 -40"></a-entity>
+
+      <!-- Visitor -->
+      <a-entity id="rig">
+        <a-camera position="0 1.6 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 120; fly: false"></a-camera>
+      </a-entity>
+    </a-scene>
+
+    <script>
+      // Build the room and hang every frame from the generated layout.
+      AFRAME.registerComponent('gallery', {
+        init: function () {
+          const data = window.GALLERY_DATA;
+          const scene = this.el;
+          if (!data) { console.error('GALLERY_DATA missing'); return; }
+
+          document.getElementById('count').textContent = data.count + ' works · Santaphobia';
+
+          const b = data.bounds;
+          const margin = 5;
+          const minX = b.minX - margin, maxX = b.maxX + margin;
+          const minZ = b.minZ - margin, maxZ = b.maxZ + margin;
+          const w = maxX - minX, d = maxZ - minZ;
+          const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+          const wallH = 7;
+
+          const mk = (html) => {
+            const wrap = document.createElement('template');
+            wrap.innerHTML = html.trim();
+            return wrap.content.firstChild;
+          };
+
+          // Floor + ceiling
+          scene.appendChild(mk(`<a-plane rotation="-90 0 0" width="${w}" height="${d}" position="${cx} 0 ${cz}" material="color: #4a4a52; roughness: 0.95"></a-plane>`));
+          scene.appendChild(mk(`<a-plane rotation="90 0 0" width="${w}" height="${d}" position="${cx} ${wallH} ${cz}" material="color: #26262c; side: double"></a-plane>`));
+
+          // Perimeter walls
+          const wall = (x, y, z, ww, rotY) =>
+            `<a-plane position="${x} ${y} ${z}" rotation="0 ${rotY} 0" width="${ww}" height="${wallH}" material="color: #e9e7e2; side: double; roughness: 1"></a-plane>`;
+          scene.appendChild(mk(wall(cx, wallH / 2, minZ, w, 0)));
+          scene.appendChild(mk(wall(cx, wallH / 2, maxZ, w, 180)));
+          scene.appendChild(mk(wall(minX, wallH / 2, cz, d, 90)));
+          scene.appendChild(mk(wall(maxX, wallH / 2, cz, d, -90)));
+
+          // Frames
+          for (const f of data.frames) {
+            const container = mk(`<a-entity class="frame"></a-entity>`);
+            scene.appendChild(container);
+            container.object3D.position.set(f.position.x, f.position.y, f.position.z);
+            container.object3D.quaternion.set(f.quaternion.x, f.quaternion.y, f.quaternion.z, f.quaternion.w);
+
+            // Backing panel (forms partition walls where frames sit back-to-back).
+            const backing = mk(`<a-box depth="0.12" width="3" height="3" material="color: #f4f2ee; roughness: 1"></a-box>`);
+            container.appendChild(backing);
+
+            // The picture itself, on the front face (local +Z).
+            const pic = mk(`<a-entity class="picture"
+                geometry="primitive: plane; width: 2; height: 2"
+                material="shader: flat; side: double; src: url(images/${encodeURIComponent(f.file)})"
+                position="0 0 0.07"></a-entity>`);
+            container.appendChild(pic);
+
+            // Size the picture (and its backing) to the image's real aspect ratio
+            // once the texture loads. Spatial's frames are uniform scale 3, so we
+            // give every print the same height and let width follow the aspect.
+            pic.addEventListener('materialtextureloaded', function (e) {
+              const img = e.detail.texture && e.detail.texture.image;
+              if (!img || !img.width) return;
+              const aspect = img.width / img.height;
+              let h = 2.4, ww = h * aspect;
+              const maxW = 3.6;
+              if (ww > maxW) { ww = maxW; h = ww / aspect; }
+              pic.setAttribute('geometry', { width: ww, height: h });
+              backing.setAttribute('width', ww + 0.25);
+              backing.setAttribute('height', h + 0.25);
+            });
+          }
+
+          // Place the visitor at the recorded spawn point.
+          const rig = document.getElementById('rig');
+          rig.object3D.position.set(data.spawn.x, 0, data.spawn.z);
+
+          // Fade the hint out after a few seconds.
+          setTimeout(() => document.getElementById('intro').classList.add('hide'), 6000);
+        },
+      });
+    </script>
+  </body>
+</html>

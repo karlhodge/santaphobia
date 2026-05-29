@@ -1,0 +1,5 @@
+# Place the 66 gallery photos in this folder (see MANIFEST.txt).
+# The image files themselves are intentionally not committed.
+*
+!.gitignore
+!MANIFEST.txt
