@@ -28,9 +28,10 @@
 
     <a-scene gallery background="color: #1a1a1f" fog="type: linear; color: #1a1a1f; near: 35; far: 95" renderer="colorManagement: true; antialias: true">
       <!-- Lighting -->
-      <a-entity light="type: ambient; color: #cfd3da; intensity: 0.85"></a-entity>
-      <a-entity light="type: directional; color: #ffffff; intensity: 0.6; castShadow: false" position="10 25 5"></a-entity>
-      <a-entity light="type: directional; color: #ffffff; intensity: 0.35" position="-15 20 -40"></a-entity>
+      <a-entity light="type: hemisphere; color: #ffffff; groundColor: #6b6b73; intensity: 0.7"></a-entity>
+      <a-entity light="type: ambient; color: #cfd3da; intensity: 0.45"></a-entity>
+      <a-entity light="type: directional; color: #ffffff; intensity: 0.55" position="12 26 6"></a-entity>
+      <a-entity light="type: directional; color: #ffffff; intensity: 0.3" position="-18 22 -42"></a-entity>
 
       <!-- Visitor -->
       <a-entity id="rig">

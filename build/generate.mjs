@@ -130,6 +130,40 @@ for (const key of Object.keys(s.images)) {
 
 frames.sort((a, b) => Number(a.id) - Number(b.id));
 
+// --- Infer walls from the frames -------------------------------------------
+// A picture hangs flat against a wall, facing into the room, so a wall surface
+// exists directly behind it in the same plane. Frames that share a facing axis
+// and lie on a common line trace out one wall; back-to-back frames (opposite
+// facings on the same line) form a partition with art on both sides.
+function facingAxis(q) {
+  // rotate local +Z by the quaternion -> world normal, then snap to an axis.
+  const { x, y, z, w } = q;
+  const nx = 2 * (x * z + w * y);
+  const nz = 1 - 2 * (x * x + y * y);
+  const n = Math.hypot(nx, nz) || 1;
+  const ux = nx / n, uz = nz / n;
+  return Math.abs(ux) > Math.abs(uz) ? (ux > 0 ? '+X' : '-X') : (uz > 0 ? '+Z' : '-Z');
+}
+
+const wallGroups = {};
+for (const f of frames) {
+  const face = facingAxis(f.quaternion);
+  const along = face[1] === 'X' ? 'Z' : 'X'; // wall runs along this axis
+  const at = along === 'Z' ? f.position.x : f.position.z; // constant coordinate
+  const key = face + '@' + (Math.round(at * 2) / 2);
+  (wallGroups[key] = wallGroups[key] || { face, along, at, frames: [] }).frames.push(f);
+}
+
+const WALL_END_MARGIN = 2.3; // extend a wall past its outermost frames
+const walls = Object.values(wallGroups).map((g) => {
+  const t = g.frames.map((f) => (g.along === 'Z' ? f.position.z : f.position.x));
+  const lo = Math.min(...t) - WALL_END_MARGIN;
+  const hi = Math.max(...t) + WALL_END_MARGIN;
+  return { face: g.face, along: g.along, at: +g.at.toFixed(3), lo: +lo.toFixed(3), hi: +hi.toFixed(3), count: g.frames.length };
+});
+
+frames.sort((a, b) => Number(a.id) - Number(b.id));
+
 // Spawn point (where the visitor starts).
 const spawnT = s.transforms[String(s.spawnPoints ? Object.keys(s.spawnPoints)[0] : '')] ||
   s.transforms['10012'];
@@ -146,7 +180,7 @@ const bounds = {
   maxZ: Math.max(...zs, spawn.z),
 };
 
-const out = { frames, spawn, bounds, count: frames.length };
+const out = { frames, walls, spawn, bounds, count: frames.length };
 
 fs.writeFileSync(path.join(root, 'gallery-data.json'), JSON.stringify(out, null, 2));
 fs.writeFileSync(
@@ -161,6 +195,7 @@ fs.writeFileSync(path.join(root, 'images', 'MANIFEST.txt'),
   'Expected image files (drop these into this folder):\n\n' + manifest.join('\n') + '\n');
 
 console.log(`frames: ${frames.length}`);
+console.log(`walls:  ${walls.length} inferred`);
 console.log(`spawn:  x=${spawn.x.toFixed(2)} y=${spawn.y.toFixed(2)} z=${spawn.z.toFixed(2)}`);
 console.log(`bounds: x[${bounds.minX.toFixed(1)}, ${bounds.maxX.toFixed(1)}]  z[${bounds.minZ.toFixed(1)}, ${bounds.maxZ.toFixed(1)}]`);
 if (missing.length) {
