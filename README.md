@@ -6,9 +6,28 @@ sunset. It uses [A-Frame](https://aframe.io) (WebGL/WebXR), so it runs in any
 browser, on mobile, and in VR headsets — and embeds anywhere with an `<iframe>`.
 
 The scene export (`scene-data.json`) contained no 3D geometry — only the
-positions of 66 image frames inside one of Spatial's built-in room templates.
-That template is gone, so this project rebuilds a comparable gallery room and
-hangs every image at its **exact recorded position, rotation and scale**.
+positions of 66 image frames inside Spatial's **Obsidian Gallery** room
+template. The room itself is included here as `models/obsidian-gallery.glb`
+(converted from the original Unity/FBX template), and every image is hung at its
+**exact recorded position, rotation and scale** inside it.
+
+If `models/obsidian-gallery.glb` is present the gallery loads the real room; if
+it's removed, the page falls back to a plain stand-in room sized to the frame
+layout, so it stays walkable either way.
+
+### How the room model was made
+
+The Obsidian Gallery shipped as a Unity project. The conversion (done without
+Unity) was:
+
+1. `Assets/Obsidian/Models/Gallery2nd.fbx` → glTF via
+   [`fbx2gltf`](https://github.com/facebookincubator/FBX2glTF).
+2. The FBX carries mesh + UVs but not texture bindings (Unity keeps those in
+   `.mat` files), so the 13 textures were re-attached by reading the Unity
+   materials and matching them by name, producing a self-contained textured GLB.
+
+The model's coordinate space matches the frame coordinates as-is (verified
+against the frame bounds), so it loads at an identity transform.
 
 ## Add the images
 

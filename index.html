@@ -40,22 +40,33 @@
     </a-scene>
 
     <script>
+      // Plain stand-in room used only when no GLB model is present.
+      function buildFallbackRoom(scene, mk, data) {
+        const b = data.bounds;
+        const margin = 5;
+        const minX = b.minX - margin, maxX = b.maxX + margin;
+        const minZ = b.minZ - margin, maxZ = b.maxZ + margin;
+        const w = maxX - minX, d = maxZ - minZ;
+        const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+        const wallH = 7;
+        scene.appendChild(mk(`<a-plane rotation="-90 0 0" width="${w}" height="${d}" position="${cx} 0 ${cz}" material="color: #4a4a52; roughness: 0.95"></a-plane>`));
+        scene.appendChild(mk(`<a-plane rotation="90 0 0" width="${w}" height="${d}" position="${cx} ${wallH} ${cz}" material="color: #26262c; side: double"></a-plane>`));
+        const wall = (x, y, z, ww, rotY) =>
+          `<a-plane position="${x} ${y} ${z}" rotation="0 ${rotY} 0" width="${ww}" height="${wallH}" material="color: #e9e7e2; side: double; roughness: 1"></a-plane>`;
+        scene.appendChild(mk(wall(cx, wallH / 2, minZ, w, 0)));
+        scene.appendChild(mk(wall(cx, wallH / 2, maxZ, w, 180)));
+        scene.appendChild(mk(wall(minX, wallH / 2, cz, d, 90)));
+        scene.appendChild(mk(wall(maxX, wallH / 2, cz, d, -90)));
+      }
+
       // Build the room and hang every frame from the generated layout.
       AFRAME.registerComponent('gallery', {
-        init: function () {
+        init: async function () {
           const data = window.GALLERY_DATA;
           const scene = this.el;
           if (!data) { console.error('GALLERY_DATA missing'); return; }
 
           document.getElementById('count').textContent = data.count + ' works · Santaphobia';
-
-          const b = data.bounds;
-          const margin = 5;
-          const minX = b.minX - margin, maxX = b.maxX + margin;
-          const minZ = b.minZ - margin, maxZ = b.maxZ + margin;
-          const w = maxX - minX, d = maxZ - minZ;
-          const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-          const wallH = 7;
 
           const mk = (html) => {
             const wrap = document.createElement('template');
@@ -63,17 +74,32 @@
             return wrap.content.firstChild;
           };
 
-          // Floor + ceiling
-          scene.appendChild(mk(`<a-plane rotation="-90 0 0" width="${w}" height="${d}" position="${cx} 0 ${cz}" material="color: #4a4a52; roughness: 0.95"></a-plane>`));
-          scene.appendChild(mk(`<a-plane rotation="90 0 0" width="${w}" height="${d}" position="${cx} ${wallH} ${cz}" material="color: #26262c; side: double"></a-plane>`));
+          // --- Environment: real Obsidian Gallery model if present, else fallback ---
+          // The original Spatial room template isn't in the scene export. If you
+          // export the Obsidian Gallery from Unity to models/obsidian-gallery.glb,
+          // it loads here as the actual room. Otherwise we build a plain stand-in
+          // sized to the frame layout so the gallery is still walkable.
+          const MODEL_URL = 'models/obsidian-gallery.glb';
+          // Optional transform to align the model to the frame coordinate space.
+          // Tweak if the room is offset/rotated/scaled relative to the frames.
+          const MODEL = window.GALLERY_MODEL || { position: '0 0 0', rotation: '0 0 0', scale: '1 1 1' };
 
-          // Perimeter walls
-          const wall = (x, y, z, ww, rotY) =>
-            `<a-plane position="${x} ${y} ${z}" rotation="0 ${rotY} 0" width="${ww}" height="${wallH}" material="color: #e9e7e2; side: double; roughness: 1"></a-plane>`;
-          scene.appendChild(mk(wall(cx, wallH / 2, minZ, w, 0)));
-          scene.appendChild(mk(wall(cx, wallH / 2, maxZ, w, 180)));
-          scene.appendChild(mk(wall(minX, wallH / 2, cz, d, 90)));
-          scene.appendChild(mk(wall(maxX, wallH / 2, cz, d, -90)));
+          let hasModel = false;
+          try {
+            const head = await fetch(MODEL_URL, { method: 'HEAD' });
+            hasModel = head.ok && (head.headers.get('content-type') || '').indexOf('text/html') === -1;
+          } catch (e) { hasModel = false; }
+
+          if (hasModel) {
+            const room = mk(`<a-entity gltf-model="url(${MODEL_URL})"
+                position="${MODEL.position}" rotation="${MODEL.rotation}" scale="${MODEL.scale}"></a-entity>`);
+            scene.appendChild(room);
+            // Lighter fog when the real room is present (it has its own walls/extent).
+            scene.setAttribute('fog', 'type: linear; color: #0d0d10; near: 45; far: 130');
+            scene.setAttribute('background', 'color: #0d0d10');
+          } else {
+            buildFallbackRoom(scene, mk, data);
+          }
 
           // Frames
           for (const f of data.frames) {
@@ -82,15 +108,18 @@
             container.object3D.position.set(f.position.x, f.position.y, f.position.z);
             container.object3D.quaternion.set(f.quaternion.x, f.quaternion.y, f.quaternion.z, f.quaternion.w);
 
-            // Backing panel (forms partition walls where frames sit back-to-back).
-            const backing = mk(`<a-box depth="0.12" width="3" height="3" material="color: #f4f2ee; roughness: 1"></a-box>`);
+            // Backing panel: a slim white mount behind each print. With the real
+            // room loaded the gallery already has walls, but the mount gives the
+            // prints a physical frame and hides any small gap to the wall.
+            const backing = mk(`<a-box depth="0.08" width="3" height="3" material="color: #f4f2ee; roughness: 1"></a-box>`);
+            backing.object3D.position.z = -0.04;
             container.appendChild(backing);
 
             // The picture itself, on the front face (local +Z).
             const pic = mk(`<a-entity class="picture"
                 geometry="primitive: plane; width: 2; height: 2"
                 material="shader: flat; side: double; src: url(images/${encodeURIComponent(f.file)})"
-                position="0 0 0.07"></a-entity>`);
+                position="0 0 0.03"></a-entity>`);
             container.appendChild(pic);
 
             // Size the picture (and its backing) to the image's real aspect ratio
@@ -109,9 +138,11 @@
             });
           }
 
-          // Place the visitor at the recorded spawn point.
+          // Place the visitor at the recorded spawn point, standing on the floor.
+          // The Obsidian model's floor sits a little below y=0.
+          const floorY = hasModel ? -0.61 : 0;
           const rig = document.getElementById('rig');
-          rig.object3D.position.set(data.spawn.x, 0, data.spawn.z);
+          rig.object3D.position.set(data.spawn.x, floorY, data.spawn.z);
 
           // Fade the hint out after a few seconds.
           setTimeout(() => document.getElementById('intro').classList.add('hide'), 6000);
