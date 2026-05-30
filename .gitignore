@@ -1,0 +1,8 @@
+# Node deps used only by the optional offline preview renderer (build/render-preview.mjs).
+# Install locally with:  npm install --no-save pngjs jpeg-js
+node_modules/
+package-lock.json
+
+# Local preview output
+preview*.png
+shot*.png
