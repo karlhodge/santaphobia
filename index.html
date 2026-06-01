@@ -26,18 +26,28 @@
     </div>
     <div id="count"></div>
 
-    <a-scene gallery background="color: #d3e4f0" fog="type: linear; color: #dbe9f2; near: 80; far: 280"
+    <a-scene gallery background="color: #a7bfde" fog="type: linear; color: #a7bfde; near: 90; far: 320"
              renderer="colorManagement: true; antialias: true; physicallyCorrectLights: false; toneMapping: ACESFilmic; exposure: 1.15">
+      <a-assets>
+        <img id="skyTex" src="textures/obsidian-sky.jpg" crossorigin="anonymous" />
+        <img id="waterNormal" src="textures/water-normal.png" crossorigin="anonymous" />
+      </a-assets>
+
       <!-- Lighting: bright, airy daylight gallery -->
       <a-entity light="type: hemisphere; color: #ffffff; groundColor: #b9bcc4; intensity: 1.15"></a-entity>
       <a-entity light="type: ambient; color: #ffffff; intensity: 0.55"></a-entity>
       <a-entity light="type: directional; color: #fff6e8; intensity: 1.0" position="14 30 8"></a-entity>
       <a-entity light="type: directional; color: #eaf0ff; intensity: 0.5" position="-20 24 -46"></a-entity>
 
-      <!-- Sky + surrounding reflecting pool, like the original Spatial template -->
-      <a-sky color="#bcd6ea"></a-sky>
-      <a-plane id="water" rotation="-90 0 0" width="3000" height="3000" position="0 0.03 -22"
-               material="shader: standard; color: #4f7da6; roughness: 0.18; metalness: 0.35"></a-plane>
+      <!-- Sky panorama + surrounding reflecting pool, from the original template.
+           The water uses the Obsidian water normal map and its real slate-blue
+           colour, sits just above the model's own water mesh (no z-fighting),
+           and drifts gently via the water-flow component. -->
+      <a-sky src="#skyTex"></a-sky>
+      <a-plane id="water" water-flow rotation="-90 0 0" width="3000" height="3000" position="0 0.05 -22"
+               material="shader: standard; color: #525c67;
+                         normalMap: #waterNormal; normalTextureRepeat: 500 500; normalScale: 0.5 0.5;
+                         roughness: 0.2; metalness: 0.1"></a-plane>
 
       <!-- Visitor -->
       <a-entity id="rig">
@@ -46,6 +56,17 @@
     </a-scene>
 
     <script>
+      // Slowly scroll the water's normal map so the reflecting pool ripples.
+      AFRAME.registerComponent('water-flow', {
+        tick: function (time, dt) {
+          const mesh = this.el.getObject3D('mesh');
+          const nm = mesh && mesh.material && mesh.material.normalMap;
+          if (!nm) return;
+          nm.offset.x = (nm.offset.x + dt * 0.000004) % 1;
+          nm.offset.y = (nm.offset.y + dt * 0.000006) % 1;
+        },
+      });
+
       // Plain stand-in room used only when no GLB model is present.
       function buildFallbackRoom(scene, mk, data) {
         const b = data.bounds;
