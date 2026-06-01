@@ -109,8 +109,7 @@
             // Backing panel: a slim white mount behind each print. With the real
             // room loaded the gallery already has walls, but the mount gives the
             // prints a physical frame and hides any small gap to the wall.
-            const backing = mk(`<a-box depth="0.08" width="3" height="3" material="color: #f4f2ee; roughness: 1"></a-box>`);
-            backing.object3D.position.z = -0.04;
+            const backing = mk(`<a-box depth="0.08" width="3" height="3" position="0 0 -0.04" material="color: #f4f2ee; roughness: 1"></a-box>`);
             container.appendChild(backing);
 
             // The picture itself, on the front face (local +Z).
