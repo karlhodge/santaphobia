@@ -1,5 +1,15 @@
-# Place the 66 gallery photos in this folder (see MANIFEST.txt).
-# The image files themselves are intentionally not committed.
+# Gallery photos ARE committed and deployed with the site.
+# Drop the 66 files listed in MANIFEST.txt into this folder, then
+# `git add images/` — the image types below will be tracked.
+#
+# Ignore everything by default...
 *
+# ...but keep these:
 !.gitignore
 !MANIFEST.txt
+!*.jpg
+!*.JPG
+!*.jpeg
+!*.JPEG
+!*.png
+!*.PNG
