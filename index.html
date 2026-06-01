@@ -26,7 +26,7 @@
     </div>
     <div id="count"></div>
 
-    <a-scene gallery background="color: #d8dde3" fog="type: linear; color: #d8dde3; near: 50; far: 140"
+    <a-scene gallery background="color: #d3e4f0" fog="type: linear; color: #dbe9f2; near: 80; far: 280"
              renderer="colorManagement: true; antialias: true; physicallyCorrectLights: false; toneMapping: ACESFilmic; exposure: 1.15">
       <!-- Lighting: bright, airy daylight gallery -->
       <a-entity light="type: hemisphere; color: #ffffff; groundColor: #b9bcc4; intensity: 1.15"></a-entity>
@@ -34,9 +34,14 @@
       <a-entity light="type: directional; color: #fff6e8; intensity: 1.0" position="14 30 8"></a-entity>
       <a-entity light="type: directional; color: #eaf0ff; intensity: 0.5" position="-20 24 -46"></a-entity>
 
+      <!-- Sky + surrounding reflecting pool, like the original Spatial template -->
+      <a-sky color="#bcd6ea"></a-sky>
+      <a-plane id="water" rotation="-90 0 0" width="3000" height="3000" position="0 0.03 -22"
+               material="shader: standard; color: #4f7da6; roughness: 0.18; metalness: 0.35"></a-plane>
+
       <!-- Visitor -->
       <a-entity id="rig">
-        <a-camera position="0 1.6 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 120; fly: false"></a-camera>
+        <a-camera position="0 1.65 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 25; fly: false"></a-camera>
       </a-entity>
     </a-scene>
 
@@ -136,8 +141,9 @@
           }
 
           // Place the visitor at the recorded spawn point, standing on the floor.
-          // The Obsidian model's floor sits a little below y=0.
-          const floorY = hasModel ? -0.61 : 0;
+          // The Obsidian model's walkable floor sits at y≈0.305 (one foot); with
+          // the camera ~1.65 m above that, the eye is at a natural standing level.
+          const floorY = hasModel ? 0.305 : 0;
           const rig = document.getElementById('rig');
           rig.object3D.position.set(data.spawn.x, floorY, data.spawn.z);
 
