@@ -31,23 +31,31 @@
       <a-assets>
         <img id="skyTex" src="textures/obsidian-sky.jpg" crossorigin="anonymous" />
         <img id="waterNormal" src="textures/water-normal.png" crossorigin="anonymous" />
+        <img id="cloudTex" src="textures/clouds.png" crossorigin="anonymous" />
       </a-assets>
 
-      <!-- Lighting: bright, airy daylight gallery -->
-      <a-entity light="type: hemisphere; color: #ffffff; groundColor: #b9bcc4; intensity: 1.15"></a-entity>
-      <a-entity light="type: ambient; color: #ffffff; intensity: 0.55"></a-entity>
-      <a-entity light="type: directional; color: #fff6e8; intensity: 1.0" position="14 30 8"></a-entity>
-      <a-entity light="type: directional; color: #eaf0ff; intensity: 0.5" position="-20 24 -46"></a-entity>
+      <!-- Lighting: airy gallery fill + a warm low "sun" matching the sunrise in
+           the sky panorama (low on the horizon, over the entrance pool). -->
+      <a-entity light="type: hemisphere; color: #ffffff; groundColor: #b9bcc4; intensity: 1.05"></a-entity>
+      <a-entity light="type: ambient; color: #ffffff; intensity: 0.5"></a-entity>
+      <a-entity light="type: directional; color: #ffe2b0; intensity: 1.5" position="60 22 110"></a-entity>
+      <a-entity light="type: directional; color: #dfe8ff; intensity: 0.4" position="-20 24 -46"></a-entity>
 
       <!-- Sky panorama + surrounding reflecting pool, from the original template.
-           The water uses the Obsidian water normal map and its real slate-blue
-           colour, sits just above the model's own water mesh (no z-fighting),
-           and drifts gently via the water-flow component. -->
+           The water uses the Obsidian water normal map at its real slate-blue
+           colour and drifts gently via the water-flow component; the model's own
+           water mesh is hidden (see init) so there's no z-fighting. -->
       <a-sky src="#skyTex"></a-sky>
-      <a-plane id="water" water-flow rotation="-90 0 0" width="3000" height="3000" position="0 0.05 -22"
+      <a-plane id="water" water-flow rotation="-90 0 0" width="3000" height="3000" position="0 0.04 -22"
                material="shader: standard; color: #525c67;
                          normalMap: #waterNormal; normalTextureRepeat: 500 500; normalScale: 0.5 0.5;
                          roughness: 0.2; metalness: 0.1"></a-plane>
+
+      <!-- Gentle drifting overhead clouds (dome cap, slowly rotating). -->
+      <a-entity id="clouds" scale="1 0.5 1"
+                geometry="primitive: sphere; radius: 800; thetaLength: 88; segmentsWidth: 48; segmentsHeight: 24"
+                material="src: #cloudTex; transparent: true; opacity: 0.8; side: back; depthWrite: false; fog: false"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 360000; easing: linear"></a-entity>
 
       <!-- Visitor -->
       <a-entity id="rig">
@@ -120,6 +128,15 @@
           if (hasModel) {
             const room = mk(`<a-entity gltf-model="url(${MODEL_URL})"
                 position="${MODEL.position}" rotation="${MODEL.rotation}" scale="${MODEL.scale}"></a-entity>`);
+            // Hide the model's built-in water mesh; our larger animated pool
+            // replaces it (otherwise the two coplanar surfaces z-fight at the
+            // entrance pool).
+            room.addEventListener('model-loaded', function () {
+              room.object3D.traverse(function (o) {
+                const nm = ((o.name || '') + ' ' + (o.material && o.material.name || '')).toLowerCase();
+                if (nm.includes('water')) o.visible = false;
+              });
+            });
             scene.appendChild(room);
           } else {
             buildFallbackRoom(scene, mk, data);
