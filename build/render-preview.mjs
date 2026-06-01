@@ -199,15 +199,15 @@ json.meshes.forEach((mesh, mi) => {
   }
 });
 
-// ---------- draw hung pictures (the two we have) ----------
-const photos = { 'Enlight28.JPG': 'images/Enlight28.JPG', 'IMG_1431.JPG': 'images/IMG_1431.JPG' };
+// ---------- draw hung pictures (every photo present in images/) ----------
 function quatRotate(q, v) {
   const m = quatMat(q);
   return [m[0] * v[0] + m[3] * v[1] + m[6] * v[2], m[1] * v[0] + m[4] * v[1] + m[7] * v[2], m[2] * v[0] + m[5] * v[1] + m[8] * v[2]];
 }
 for (const f of gd.frames) {
-  if (!photos[f.file]) continue;
-  const tex = decodeJpegFile(photos[f.file]);
+  const path = 'images/' + f.file;
+  if (!fs.existsSync(path)) continue;
+  let tex; try { tex = decodeJpegFile(path); } catch (e) { continue; }
   const aspect = tex.width / tex.height;
   let h = 2.4, w = h * aspect; if (w > 3.6) { w = 3.6; h = w / aspect; }
   const q = [f.quaternion.x, f.quaternion.y, f.quaternion.z, f.quaternion.w];
