@@ -65,31 +65,39 @@ for (const p of pairs) { if (fUsed[p.fi] || uUsed[p.ui]) continue; fUsed[p.fi] =
 console.log('assignment mean match error (old space):', (matchErr / data.frames.length).toFixed(3), 'm');
 
 // ---------- place ----------
+// The Unity placeholder's facing is authoritative (designer intent). Seat each
+// frame flush on the wall directly BEHIND its facing axis (raycast), so corner
+// / island frames can't get stuck on a wrong neighbouring wall and end up
+// backwards.
 const PROUD = 0.06;
-let reproj = 0, kept = 0, maxOff = 0;
+function rayTri(orig, dir, a, b, c) { // Möller–Trumbore, returns t>0 or null
+  const e1 = sub(b, a), e2 = sub(c, a), p = cross(dir, e2); const det = dot(e1, p);
+  if (Math.abs(det) < 1e-7) return null; const inv = 1 / det; const tv = sub(orig, a);
+  const u = dot(tv, p) * inv; if (u < -1e-4 || u > 1.0001) return null;
+  const q = cross(tv, e1); const v = dot(dir, q) * inv; if (v < -1e-4 || u + v > 1.0001) return null;
+  const t = dot(e2, q) * inv; return t > 1e-4 ? t : null;
+}
+function seatBehind(center, front) {
+  // start 1.5m out in front of the picture, cast back toward the wall behind it
+  const start = add(center, sca(front, 1.5)); const dir = sca(front, -1);
+  let bestT = null; for (const tr of tris) { const t = rayTri(start, dir, tr.a, tr.b, tr.c); if (t != null && t < 3.0 && (bestT == null || t < bestT)) bestT = t; }
+  if (bestT == null) return null; return add(start, sca(dir, bestT)); // wall point
+}
+let seated = 0, fellback = 0, maxGap = 0;
 data.frames.forEach((f, fi) => {
   const uf = UNITY.frames[assign[fi]];
   const center = toGlb([uf.pos.x, uf.pos.y, uf.pos.z]);
-  // transformed Unity facing (local +Z): apply the rotation part (negate x,z)
   const fwdU = uf.fwdZ; const fwdT = norm([CAL.sx * fwdU[0], fwdU[1], CAL.sz * fwdU[2]]);
-  const w = nearestWall(center);
-  let pos, front;
-  if (w && w.d < 1.6) {
-    // inward normal = wall normal on the side the curated facing points
-    let ndir = (dot(w.n, fwdT) >= 0) ? w.n : sca(w.n, -1);
-    ndir = norm([ndir[0], 0, ndir[2]]); // keep upright
-    front = ndir;
-    pos = add(w.cp, sca(ndir, PROUD)); // flush on wall, slightly proud
-    reproj++; if (w.d > maxOff) maxOff = w.d;
-  } else {
-    front = norm([fwdT[0], 0, fwdT[2]]);
-    pos = center; kept++;
-  }
+  const front = norm([fwdT[0], 0, fwdT[2]]); // authoritative facing, kept upright
+  const wall = seatBehind(center, front);
+  let pos;
+  if (wall) { pos = add(wall, sca(front, PROUD)); seated++; const gap = len(sub(center, wall)); if (gap > maxGap) maxGap = gap; }
+  else { pos = center; fellback++; }
   const quat = quatFromFront(front);
   f.position = { x: +pos[0].toFixed(4), y: +center[1].toFixed(4), z: +pos[2].toFixed(4) };
   f.quaternion = { x: +quat[0].toFixed(6), y: +quat[1].toFixed(6), z: +quat[2].toFixed(6), w: +quat[3].toFixed(6) };
 });
-console.log(`placed ${data.frames.length} frames | reprojected onto wall: ${reproj} | kept-as-calibrated: ${kept} | max wall offset corrected: ${maxOff.toFixed(2)}m`);
+console.log(`placed ${data.frames.length} frames | seated on wall behind: ${seated} | fell back to calibrated: ${fellback} | max center->wall gap: ${maxGap.toFixed(2)}m`);
 
 // bounds
 let bx0 = 1e9, bx1 = -1e9, bz0 = 1e9, bz1 = -1e9;
