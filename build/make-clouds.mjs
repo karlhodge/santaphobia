@@ -31,7 +31,7 @@ for (let y = 0; y < H; y++) {
     // before the horizon so the mountains/horizon stay clear.
     const v = y / H;
     const vmask = smooth(0.05, 0.14, v) * (1 - smooth(0.42, 0.50, v));
-    const a = 0.9 * smooth(0.48, 0.70, n) * vmask;
+    const a = smooth(0.42, 0.66, n) * vmask;   // denser cloud coverage
     const i = (y * W + x) * 4;
     const shade = 235 + Math.round(20 * (n - 0.5)); // subtle bright/grey variation
     png.data[i] = Math.min(255, shade);

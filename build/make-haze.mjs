@@ -10,7 +10,7 @@ const png = new PNG({ width: W, height: H });
 for (let y = 0; y < H; y++) {
   // row 0 = image top → cylinder top (transparent); row H-1 = bottom → horizon (opaque)
   const t = y / (H - 1);                 // 0 top .. 1 bottom
-  const a = Math.pow(t, 1.5) * 0.72;     // smooth fade, max ~0.72 at horizon
+  const a = Math.pow(t, 1.2) * 0.9;      // thicker haze: reaches higher, denser (max ~0.9)
   for (let x = 0; x < W; x++) {
     const i = (y * W + x) * 4;
     png.data[i] = col[0]; png.data[i + 1] = col[1]; png.data[i + 2] = col[2];

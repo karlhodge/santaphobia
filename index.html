@@ -48,19 +48,19 @@
            Water is half-transparent so the lake/rocks read through it. -->
       <a-sky src="#skyTex" radius="4000" material="fog: false" sharp-texture></a-sky>
       <a-plane id="water" water-flow sharp-texture rotation="-90 0 0" width="3000" height="3000" position="0 0.04 -22"
-               material="shader: standard; color: #525c67; transparent: true; opacity: 0.5;
+               material="shader: standard; color: #525c67; transparent: true; opacity: 0.75;
                          normalMap: #waterNormal; normalTextureRepeat: 500 500; normalScale: 0.5 0.5;
                          roughness: 0.2; metalness: 0.1"></a-plane>
 
       <!-- Horizon haze: a translucent fog-coloured ring, dense at the horizon and
            fading upward, so distant mountains blend softly into the scene. -->
-      <a-cylinder id="haze" position="0 200 -22" radius="2200" height="700" segments-radial="64" open-ended="true"
+      <a-cylinder id="haze" position="0 280 -22" radius="2200" height="950" segments-radial="64" open-ended="true"
                   material="src: #hazeTex; transparent: true; opacity: 1; side: double; depthWrite: false; fog: false"></a-cylinder>
 
       <!-- Subtle drifting clouds layered over the panorama for a little motion. -->
       <a-entity id="clouds" sharp-texture
                 geometry="primitive: sphere; radius: 2500; segmentsWidth: 64; segmentsHeight: 40"
-                material="src: #cloudTex; transparent: true; opacity: 0.45; side: back; depthWrite: false; fog: false"
+                material="src: #cloudTex; transparent: true; opacity: 0.7; side: back; depthWrite: false; fog: false"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 480000; easing: linear"></a-entity>
 
       <!-- Visitor -->
