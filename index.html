@@ -47,15 +47,15 @@
            water mesh is hidden (see init) so there's no z-fighting. -->
       <!-- fog:false so the panorama (mountains, sun, gradient) isn't washed out;
            the sphere sits far beyond the scene fog's far distance. -->
-      <a-sky src="#skyTex" radius="4000" material="fog: false"></a-sky>
-      <a-plane id="water" water-flow rotation="-90 0 0" width="3000" height="3000" position="0 0.04 -22"
+      <a-sky src="#skyTex" radius="4000" material="fog: false" sharp-texture></a-sky>
+      <a-plane id="water" water-flow sharp-texture rotation="-90 0 0" width="3000" height="3000" position="0 0.04 -22"
                material="shader: standard; color: #525c67;
                          normalMap: #waterNormal; normalTextureRepeat: 500 500; normalScale: 0.5 0.5;
                          roughness: 0.2; metalness: 0.1"></a-plane>
 
       <!-- Drifting clouds across the whole sky: a large translucent dome (inside
            the sky sphere) that slowly rotates so clouds move overhead. -->
-      <a-entity id="clouds"
+      <a-entity id="clouds" sharp-texture
                 geometry="primitive: sphere; radius: 2500; segmentsWidth: 64; segmentsHeight: 40"
                 material="src: #cloudTex; transparent: true; opacity: 0.85; side: back; depthWrite: false; fog: false"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 480000; easing: linear"></a-entity>
@@ -67,14 +67,31 @@
     </a-scene>
 
     <script>
-      // Slowly scroll the water's normal map so the reflecting pool ripples.
+      // Scroll the water's normal map so the reflecting pool ripples.
       AFRAME.registerComponent('water-flow', {
         tick: function (time, dt) {
           const mesh = this.el.getObject3D('mesh');
           const nm = mesh && mesh.material && mesh.material.normalMap;
           if (!nm) return;
-          nm.offset.x = (nm.offset.x + dt * 0.000004) % 1;
-          nm.offset.y = (nm.offset.y + dt * 0.000006) % 1;
+          nm.offset.x = (nm.offset.x + dt * 0.000009) % 1;
+          nm.offset.y = (nm.offset.y + dt * 0.000014) % 1;
+        },
+      });
+
+      // Apply maximum anisotropic filtering to a texture so it stays sharp at
+      // grazing angles (e.g. the sky panorama / mountains seen near the horizon).
+      AFRAME.registerComponent('sharp-texture', {
+        tick: function () {
+          if (this.done) return;
+          const mesh = this.el.getObject3D('mesh');
+          const mat = mesh && mesh.material;
+          if (!mat) return;
+          const maxA = this.el.sceneEl.renderer.capabilities.getMaxAnisotropy();
+          let set = false;
+          for (const key of ['map', 'normalMap']) {
+            if (mat[key]) { mat[key].anisotropy = maxA; mat[key].needsUpdate = true; set = true; }
+          }
+          if (set) { mat.needsUpdate = true; this.done = true; }
         },
       });
 
