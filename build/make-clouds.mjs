@@ -1,9 +1,10 @@
 // Generate a seamless, soft cloud texture (white clouds, transparent gaps) for
-// a slowly drifting overhead cloud layer. Tileable in both axes.
+// a slowly drifting cloud dome. Equirectangular 2:1, tileable in longitude, with
+// even scattered coverage across the whole sky.
 import fs from 'node:fs';
 import { PNG } from 'pngjs';
 
-const W = 1024, H = 1024;
+const W = 2048, H = 1024;
 function hash(i, j) { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); }
 function vnoise(x, y, period) {
   const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
@@ -16,8 +17,8 @@ function vnoise(x, y, period) {
   return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
 }
 function fbm(px, py) {
-  let f = 5, amp = 0.5, sum = 0, norm = 0;
-  for (let o = 0; o < 5; o++) { sum += amp * vnoise(px * f, py * f, f); norm += amp; f *= 2; amp *= 0.5; }
+  let f = 6, amp = 0.5, sum = 0, norm = 0;
+  for (let o = 0; o < 6; o++) { sum += amp * vnoise(px * f, py * f, f); norm += amp; f *= 2; amp *= 0.5; }
   return sum / norm;
 }
 const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
@@ -26,8 +27,8 @@ const png = new PNG({ width: W, height: H });
 for (let y = 0; y < H; y++) {
   for (let x = 0; x < W; x++) {
     const n = fbm(x / W, y / H);
-    // clouds where noise is high; soft edges; keep coverage airy
-    const a = smooth(0.52, 0.78, n);
+    // clouds where noise is high; soft edges; scattered but present all around
+    const a = 0.9 * smooth(0.48, 0.70, n);
     const i = (y * W + x) * 4;
     const shade = 235 + Math.round(20 * (n - 0.5)); // subtle bright/grey variation
     png.data[i] = Math.min(255, shade);

@@ -45,17 +45,18 @@
            The water uses the Obsidian water normal map at its real slate-blue
            colour and drifts gently via the water-flow component; the model's own
            water mesh is hidden (see init) so there's no z-fighting. -->
-      <a-sky src="#skyTex"></a-sky>
+      <a-sky src="#skyTex" radius="4000"></a-sky>
       <a-plane id="water" water-flow rotation="-90 0 0" width="3000" height="3000" position="0 0.04 -22"
                material="shader: standard; color: #525c67;
                          normalMap: #waterNormal; normalTextureRepeat: 500 500; normalScale: 0.5 0.5;
                          roughness: 0.2; metalness: 0.1"></a-plane>
 
-      <!-- Gentle drifting overhead clouds (dome cap, slowly rotating). -->
-      <a-entity id="clouds" scale="1 0.5 1"
-                geometry="primitive: sphere; radius: 800; thetaLength: 88; segmentsWidth: 48; segmentsHeight: 24"
-                material="src: #cloudTex; transparent: true; opacity: 0.8; side: back; depthWrite: false; fog: false"
-                animation="property: rotation; to: 0 360 0; loop: true; dur: 360000; easing: linear"></a-entity>
+      <!-- Drifting clouds across the whole sky: a large translucent dome (inside
+           the sky sphere) that slowly rotates so clouds move overhead. -->
+      <a-entity id="clouds"
+                geometry="primitive: sphere; radius: 2500; segmentsWidth: 64; segmentsHeight: 40"
+                material="src: #cloudTex; transparent: true; opacity: 0.85; side: back; depthWrite: false; fog: false"
+                animation="property: rotation; to: 0 360 0; loop: true; dur: 480000; easing: linear"></a-entity>
 
       <!-- Visitor -->
       <a-entity id="rig">
