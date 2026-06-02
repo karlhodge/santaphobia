@@ -27,8 +27,11 @@ const png = new PNG({ width: W, height: H });
 for (let y = 0; y < H; y++) {
   for (let x = 0; x < W; x++) {
     const n = fbm(x / W, y / H);
-    // clouds where noise is high; soft edges; scattered but present all around
-    const a = 0.9 * smooth(0.48, 0.70, n);
+    // keep clouds in the upper sky only: fade out near the top (pole) and well
+    // before the horizon so the mountains/horizon stay clear.
+    const v = y / H;
+    const vmask = smooth(0.05, 0.14, v) * (1 - smooth(0.42, 0.50, v));
+    const a = 0.9 * smooth(0.48, 0.70, n) * vmask;
     const i = (y * W + x) * 4;
     const shade = 235 + Math.round(20 * (n - 0.5)); // subtle bright/grey variation
     png.data[i] = Math.min(255, shade);
