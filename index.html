@@ -26,7 +26,7 @@
     </div>
     <div id="count"></div>
 
-    <a-scene gallery background="color: #8f99a6" fog="type: linear; color: #8f99a6; near: 70; far: 200"
+    <a-scene gallery background="color: #8f99a6" fog="type: linear; color: #8f99a6; near: 60; far: 150"
              renderer="colorManagement: true; antialias: true; physicallyCorrectLights: false; toneMapping: ACESFilmic; exposure: 1.15">
       <a-assets>
         <img id="skyTex" src="textures/mountains.jpg" crossorigin="anonymous" />
@@ -45,8 +45,10 @@
       <!-- 360° sky panorama (mountains + lake) + surrounding reflecting pool.
            fog:false so the panorama isn't washed out; the model's own water mesh
            is hidden in init so it can't z-fight our larger animated pool.
-           Water is half-transparent so the lake/rocks read through it. -->
-      <a-sky src="#skyTex" radius="4000" material="fog: false" sharp-texture></a-sky>
+           position y>0 lifts the sphere so the mountains' lower slopes (which sit
+           below the panorama's own horizon) rise to meet the waterline; the
+           panorama's lake stays hidden under our water. Raise/lower to taste. -->
+      <a-sky src="#skyTex" radius="4000" position="0 300 0" material="fog: false" sharp-texture></a-sky>
       <a-plane id="water" water-flow sharp-texture rotation="-90 0 0" width="3000" height="3000" position="0 0.04 -22"
                material="shader: standard; color: #525c67; transparent: true; opacity: 0.9;
                          normalMap: #waterNormal; normalTextureRepeat: 500 500; normalScale: 0.5 0.5;
@@ -56,7 +58,7 @@
            gallery floor (y<0.305) so the opaque floor hides it indoors, while it
            reads as low fog on the lake outside. Distance fog (above) blends it. -->
       <a-plane id="mist" drift-map rotation="-90 0 0" width="3000" height="3000" position="0 0.25 -22"
-               material="src: #mistTex; transparent: true; opacity: 0.5; side: double; depthWrite: false; repeat: 6 6"></a-plane>
+               material="src: #mistTex; transparent: true; opacity: 0.6; side: double; depthWrite: false; repeat: 6 6"></a-plane>
 
       <!-- Subtle drifting clouds layered over the panorama for a little motion. -->
       <a-entity id="clouds" sharp-texture
