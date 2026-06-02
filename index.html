@@ -26,13 +26,13 @@
     </div>
     <div id="count"></div>
 
-    <a-scene gallery background="color: #8f99a6" fog="type: linear; color: #8f99a6; near: 70; far: 300"
+    <a-scene gallery background="color: #8f99a6" fog="type: linear; color: #8f99a6; near: 70; far: 200"
              renderer="colorManagement: true; antialias: true; physicallyCorrectLights: false; toneMapping: ACESFilmic; exposure: 1.15">
       <a-assets>
         <img id="skyTex" src="textures/mountains.jpg" crossorigin="anonymous" />
         <img id="waterNormal" src="textures/water-normal.png" crossorigin="anonymous" />
         <img id="cloudTex" src="textures/clouds.png" crossorigin="anonymous" />
-        <img id="hazeTex" src="textures/haze-gradient.png" crossorigin="anonymous" />
+        <img id="mistTex" src="textures/mist.png" crossorigin="anonymous" />
       </a-assets>
 
       <!-- Lighting: airy gallery fill + a high near-white "sun" matching the sun
@@ -48,14 +48,15 @@
            Water is half-transparent so the lake/rocks read through it. -->
       <a-sky src="#skyTex" radius="4000" material="fog: false" sharp-texture></a-sky>
       <a-plane id="water" water-flow sharp-texture rotation="-90 0 0" width="3000" height="3000" position="0 0.04 -22"
-               material="shader: standard; color: #525c67; transparent: true; opacity: 0.75;
+               material="shader: standard; color: #525c67; transparent: true; opacity: 0.9;
                          normalMap: #waterNormal; normalTextureRepeat: 500 500; normalScale: 0.5 0.5;
                          roughness: 0.2; metalness: 0.1"></a-plane>
 
-      <!-- Horizon haze: a translucent fog-coloured ring, dense at the horizon and
-           fading upward, so distant mountains blend softly into the scene. -->
-      <a-cylinder id="haze" position="0 280 -22" radius="2200" height="950" segments-radial="64" open-ended="true"
-                  material="src: #hazeTex; transparent: true; opacity: 1; side: double; depthWrite: false; fog: false"></a-cylinder>
+      <!-- Drifting mist over the water, OUTSIDE only: it sits just below the
+           gallery floor (y<0.305) so the opaque floor hides it indoors, while it
+           reads as low fog on the lake outside. Distance fog (above) blends it. -->
+      <a-plane id="mist" drift-map rotation="-90 0 0" width="3000" height="3000" position="0 0.25 -22"
+               material="src: #mistTex; transparent: true; opacity: 0.5; side: double; depthWrite: false; repeat: 6 6"></a-plane>
 
       <!-- Subtle drifting clouds layered over the panorama for a little motion. -->
       <a-entity id="clouds" sharp-texture
@@ -78,6 +79,17 @@
           if (!nm) return;
           nm.offset.x = (nm.offset.x + dt * 0.000009) % 1;
           nm.offset.y = (nm.offset.y + dt * 0.000014) % 1;
+        },
+      });
+
+      // Scroll a material's base map so the mist layer drifts.
+      AFRAME.registerComponent('drift-map', {
+        tick: function (time, dt) {
+          const mesh = this.el.getObject3D('mesh');
+          const m = mesh && mesh.material && mesh.material.map;
+          if (!m) return;
+          m.offset.x = (m.offset.x + dt * 0.000008) % 1;
+          m.offset.y = (m.offset.y + dt * 0.000005) % 1;
         },
       });
 
