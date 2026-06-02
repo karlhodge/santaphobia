@@ -4,8 +4,8 @@ Each wall **plane** has a letter; each print has a number. To fix a misplaced pr
 
 | plane | orientation | wall offset | prints on it |
 |:---:|:--|--:|:--|
-| **A** | faces South (+Z) | Z=-45.8 | 53, 54, 55, 56 |
-| **B** | faces South (+Z) | Z=-45.8 | 59, 60, 61, 62 |
+| **A** | faces South (+Z) | Z=-45.7 | 53, 54, 55, 56 |
+| **B** | faces South (+Z) | Z=-45.7 | 59, 60, 61, 62 |
 | **C** | faces East (+X) | X=-24.0 | 64 |
 | **D** | faces West (−X) | X=24.0 | 57 |
 | **E** | faces South (+Z) | Z=-42.9 | 46 |
@@ -30,10 +30,10 @@ Each wall **plane** has a letter; each print has a number. To fix a misplaced pr
 | **X** | faces West (−X) | X=24.0 | 19 |
 | **Y** | faces West (−X) | X=-24.7 | 38 |
 | **Z** | faces East (+X) | X=24.7 | 35 |
-| **AA** | faces North (−Z) | Z=-9.9 | 20, 21, 22 |
-| **AB** | faces North (−Z) | Z=-9.9 | 15, 16, 17 |
-| **AC** | faces South (+Z) | Z=-9.5 | 7, 9, 11, 13 |
-| **AD** | faces South (+Z) | Z=-9.5 | 8, 10, 12, 14 |
+| **AA** | faces North (−Z) | Z=-10.1 | 20, 21, 22 |
+| **AB** | faces North (−Z) | Z=-10.1 | 15, 16, 17 |
+| **AC** | faces South (+Z) | Z=-9.3 | 7, 9, 11, 13 |
+| **AD** | faces South (+Z) | Z=-9.3 | 8, 10, 12, 14 |
 
 ## Every print → its current plane
 
