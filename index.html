@@ -66,7 +66,7 @@
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 480000; easing: linear"></a-entity>
 
       <!-- Visitor -->
-      <a-entity id="rig">
+      <a-entity id="rig" key-turn>
         <a-camera position="0 1.65 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 25; fly: false" wall-collider="buffer: 0.4"></a-camera>
       </a-entity>
     </a-scene>
@@ -160,6 +160,32 @@
             obj.position.x = corrected.x; obj.position.z = corrected.z;
           }
           obj.getWorldPosition(this.prev);
+        },
+      });
+
+      // Turn the view with Q (left) / E (right) — rotates the rig so it composes
+      // with mouse look-controls; held = continuous smooth turn.
+      AFRAME.registerComponent('key-turn', {
+        schema: { speed: { default: 90 } },   // degrees per second
+        init: function () {
+          this.q = false; this.e = false;
+          const set = (e, v) => { if (e.code === 'KeyQ') this.q = v; else if (e.code === 'KeyE') this.e = v; };
+          this.onDown = (e) => set(e, true);
+          this.onUp = (e) => set(e, false);
+          this.onBlur = () => { this.q = false; this.e = false; };
+          window.addEventListener('keydown', this.onDown);
+          window.addEventListener('keyup', this.onUp);
+          window.addEventListener('blur', this.onBlur);
+        },
+        remove: function () {
+          window.removeEventListener('keydown', this.onDown);
+          window.removeEventListener('keyup', this.onUp);
+          window.removeEventListener('blur', this.onBlur);
+        },
+        tick: function (time, dt) {
+          const d = (this.q ? 1 : 0) - (this.e ? 1 : 0);   // Q=+left, E=-right
+          if (!d) return;
+          this.el.object3D.rotation.y += d * THREE.MathUtils.degToRad(this.data.speed) * (dt / 1000);
         },
       });
 
