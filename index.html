@@ -67,7 +67,7 @@
 
       <!-- Visitor -->
       <a-entity id="rig">
-        <a-camera position="0 1.65 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 25; fly: false"></a-camera>
+        <a-camera position="0 1.65 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 25; fly: false" wall-collider="buffer: 0.4"></a-camera>
       </a-entity>
     </a-scene>
 
@@ -108,6 +108,58 @@
             if (mat[key]) { mat[key].anisotropy = maxA; mat[key].needsUpdate = true; set = true; }
           }
           if (set) { mat.needsUpdate = true; this.done = true; }
+        },
+      });
+
+      // Stop the camera passing through walls. Each frame it validates the move
+      // the controls just made: raycast from the previous position toward the new
+      // one against the room meshes; if a wall is within the buffer, slide along
+      // the wall (remove the into-wall component) or, if that's blocked too, stop.
+      AFRAME.registerComponent('wall-collider', {
+        schema: { buffer: { default: 0.4 } },
+        init: function () {
+          this.ray = new THREE.Raycaster();
+          this.prev = new THREE.Vector3();
+          this.cur = new THREE.Vector3();
+          this.targets = [];
+          this.ready = false;
+          this.el.object3D.getWorldPosition(this.prev);
+        },
+        clear: function (mx, mz) {            // true if path of length |m| (+buffer) is wall-free
+          const d = Math.hypot(mx, mz);
+          if (d < 1e-6) return true;
+          this.ray.set(new THREE.Vector3(this.prev.x, this.prev.y, this.prev.z), new THREE.Vector3(mx / d, 0, mz / d));
+          this.ray.far = d + this.data.buffer;
+          return this.ray.intersectObjects(this.targets, false).length === 0;
+        },
+        tick: function () {
+          const obj = this.el.object3D;
+          if (!this.ready) {
+            const room = this.roomEl || (this.roomEl = document.querySelector('[gltf-model]'));
+            const m = room && room.getObject3D('mesh');
+            if (m) { this.targets = []; m.traverse((o) => { if (o.isMesh) this.targets.push(o); }); this.ready = this.targets.length > 0; }
+            obj.getWorldPosition(this.prev);
+            return;
+          }
+          obj.getWorldPosition(this.cur);
+          const dx = this.cur.x - this.prev.x, dz = this.cur.z - this.prev.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist < 1e-5) { this.prev.copy(this.cur); return; }
+          if (!this.clear(dx, dz)) {
+            let nx = this.prev.x, nz = this.prev.z;     // default: stop
+            const hit = this.ray.intersectObjects(this.targets, false)[0];
+            if (hit && hit.face) {
+              const n = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+              n.y = 0; n.normalize();
+              const dot = dx * n.x + dz * n.z;
+              const sx = dx - n.x * dot, sz = dz - n.z * dot;   // slide along the wall
+              if (this.clear(sx, sz)) { nx = this.prev.x + sx; nz = this.prev.z + sz; }
+            }
+            const corrected = new THREE.Vector3(nx, this.cur.y, nz);
+            obj.parent.worldToLocal(corrected);
+            obj.position.x = corrected.x; obj.position.z = corrected.z;
+          }
+          obj.getWorldPosition(this.prev);
         },
       });
 
