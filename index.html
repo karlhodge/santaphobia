@@ -337,7 +337,7 @@
       window.WindChimes = (function () {
         var ctx, master, comp, chimePanner, chimeBus, running = false, timer = null, muted = false;
         var CHIME_VOL = 0.1;    // chime level
-        var DRONE_VOL = 0.1;    // drone level at its reference distance (the back)
+        var DRONE_VOL = 0.06;   // drone level at the back (its loudest point — kept quiet)
         // E minor pentatonic (B D E G A), high chime register
         var NOTES = [987.77, 1174.66, 1318.51, 1567.98, 1760.00, 1975.53, 2349.32, 2637.02];
 
@@ -377,8 +377,8 @@
         function startDrone(pos) {
           var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 0.5;
           var dg = ctx.createGain(); dg.gain.value = DRONE_VOL;
-          var dp = ctx.createPanner(); dp.panningModel = 'HRTF'; dp.distanceModel = 'inverse';
-          dp.refDistance = 8; dp.maxDistance = 140; dp.rolloffFactor = 1.0; setPos(dp, pos);
+          var dp = ctx.createPanner(); dp.panningModel = 'HRTF'; dp.distanceModel = 'linear';
+          dp.refDistance = 4; dp.maxDistance = 46; dp.rolloffFactor = 1.0; setPos(dp, pos); // linear -> ~0 by the entrance
           lp.connect(dg); dg.connect(dp); dp.connect(master);
           // an octave lower: E0 + detuned E1 octave + B1 fifth — tuned to E
           var voices = [[20.60, 'sine', 0.5, 0], [41.20, 'triangle', 0.28, 4], [41.20, 'triangle', 0.28, -5], [61.74, 'sine', 0.14, 3]];
@@ -395,7 +395,7 @@
           noise.connect(ng); ng.connect(lp); noise.start();
           // slow, ambient phasing: gentle amplitude + filter-cutoff drift
           var ampLFO = ctx.createOscillator(); ampLFO.type = 'sine'; ampLFO.frequency.value = 0.04;    // ~25s breathing
-          var ampDepth = ctx.createGain(); ampDepth.gain.value = 0.07;
+          var ampDepth = ctx.createGain(); ampDepth.gain.value = 0.03;
           ampLFO.connect(ampDepth); ampDepth.connect(dg.gain); ampLFO.start();
           var filtLFO = ctx.createOscillator(); filtLFO.type = 'sine'; filtLFO.frequency.value = 0.025; // ~40s sweep
           var filtDepth = ctx.createGain(); filtDepth.gain.value = 120;
