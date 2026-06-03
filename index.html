@@ -19,9 +19,10 @@
       #intro.hide { opacity: 0; }
       #count { position: fixed; z-index: 10; left: 12px; bottom: 10px; color: #aaa; font-size: 12px; }
       #muteBtn {
-        position: fixed; z-index: 10; right: 12px; top: 12px; display: none;
-        width: 40px; height: 34px; font-size: 16px; cursor: pointer; color: #fff;
-        background: rgba(0,0,0,0.45); border: 0; border-radius: 8px; backdrop-filter: blur(4px);
+        /* stacked directly above A-Frame's Enter-VR button (right: 20px; bottom: 20px) */
+        position: fixed; z-index: 10; right: 20px; bottom: 64px; display: none;
+        width: 58px; height: 34px; font-size: 16px; cursor: pointer; color: #fff;
+        background: rgba(0,0,0,0.35); border: 0; border-radius: 8px;
       }
       #muteBtn:hover { background: rgba(0,0,0,0.65); }
 
@@ -336,7 +337,7 @@
       window.WindChimes = (function () {
         var ctx, master, comp, chimePanner, chimeBus, running = false, timer = null, muted = false;
         var CHIME_VOL = 0.1;    // chime level
-        var DRONE_VOL = 0.16;   // drone level at its reference distance (the back)
+        var DRONE_VOL = 0.1;    // drone level at its reference distance (the back)
         // E minor pentatonic (B D E G A), high chime register
         var NOTES = [987.77, 1174.66, 1318.51, 1567.98, 1760.00, 1975.53, 2349.32, 2637.02];
 
