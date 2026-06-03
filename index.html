@@ -353,7 +353,7 @@
       window.WindChimes = (function () {
         var ctx, master, comp, chimePanner, chimeBus, running = false, timer = null, muted = false;
         var CHIME_VOL = 0.1;    // chime level
-        var DRONE_VOL = 0.3;    // drone level at its reference distance (the back)
+        var DRONE_VOL = 0.16;   // drone level at its reference distance (the back)
         // E minor pentatonic (B D E G A), high chime register
         var NOTES = [987.77, 1174.66, 1318.51, 1567.98, 1760.00, 1975.53, 2349.32, 2637.02];
 
@@ -391,23 +391,30 @@
         // Continuous low-E drone with slow phasing (detuned voices + amplitude &
         // filter LFOs), positioned so it swells as you approach its location.
         function startDrone(pos) {
-          var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 0.6;
+          var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 0.5;
           var dg = ctx.createGain(); dg.gain.value = DRONE_VOL;
           var dp = ctx.createPanner(); dp.panningModel = 'HRTF'; dp.distanceModel = 'inverse';
           dp.refDistance = 8; dp.maxDistance = 140; dp.rolloffFactor = 1.0; setPos(dp, pos);
           lp.connect(dg); dg.connect(dp); dp.connect(master);
-          // root E1 + octave E2 (detuned twin for beating) + fifth B2 — tuned to E
-          var voices = [[41.20, 'sine', 0.5, 0], [82.41, 'triangle', 0.30, 4], [82.41, 'triangle', 0.30, -5], [123.47, 'sine', 0.16, 3]];
+          // an octave lower: E0 + detuned E1 octave + B1 fifth — tuned to E
+          var voices = [[20.60, 'sine', 0.5, 0], [41.20, 'triangle', 0.28, 4], [41.20, 'triangle', 0.28, -5], [61.74, 'sine', 0.14, 3]];
           for (var i = 0; i < voices.length; i++) {
             var o = ctx.createOscillator(); o.type = voices[i][1]; o.frequency.value = voices[i][0]; o.detune.value = voices[i][3];
             var g = ctx.createGain(); g.gain.value = voices[i][2];
             o.connect(g); g.connect(lp); o.start();
           }
-          var ampLFO = ctx.createOscillator(); ampLFO.type = 'sine'; ampLFO.frequency.value = 0.07;   // ~14s breathing
-          var ampDepth = ctx.createGain(); ampDepth.gain.value = 0.12;        // dg.gain swells 0.18–0.42
+          // brown noise wash (integrated white noise) for a soft, airy rumble
+          var nlen = Math.floor(ctx.sampleRate * 4), nbuf = ctx.createBuffer(1, nlen, ctx.sampleRate), nd = nbuf.getChannelData(0), last = 0;
+          for (var j = 0; j < nlen; j++) { var w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; nd[j] = last * 3.5; }
+          var noise = ctx.createBufferSource(); noise.buffer = nbuf; noise.loop = true;
+          var ng = ctx.createGain(); ng.gain.value = 0.1;
+          noise.connect(ng); ng.connect(lp); noise.start();
+          // slow, ambient phasing: gentle amplitude + filter-cutoff drift
+          var ampLFO = ctx.createOscillator(); ampLFO.type = 'sine'; ampLFO.frequency.value = 0.04;    // ~25s breathing
+          var ampDepth = ctx.createGain(); ampDepth.gain.value = 0.07;
           ampLFO.connect(ampDepth); ampDepth.connect(dg.gain); ampLFO.start();
-          var filtLFO = ctx.createOscillator(); filtLFO.type = 'sine'; filtLFO.frequency.value = 0.045; // ~22s sweep
-          var filtDepth = ctx.createGain(); filtDepth.gain.value = 180;       // cutoff ±180 Hz
+          var filtLFO = ctx.createOscillator(); filtLFO.type = 'sine'; filtLFO.frequency.value = 0.025; // ~40s sweep
+          var filtDepth = ctx.createGain(); filtDepth.gain.value = 120;
           filtLFO.connect(filtDepth); filtDepth.connect(lp.frequency); filtLFO.start();
         }
 
