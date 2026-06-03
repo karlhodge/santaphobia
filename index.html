@@ -185,7 +185,16 @@
         tick: function (time, dt) {
           const d = (this.q ? 1 : 0) - (this.e ? 1 : 0);   // Q=+left, E=-right
           if (!d) return;
-          this.el.object3D.rotation.y += d * THREE.MathUtils.degToRad(this.data.speed) * (dt / 1000);
+          const camEl = this.camEl || (this.camEl = this.el.querySelector('a-camera') || this.el.querySelector('[camera]'));
+          if (!camEl) return;
+          const cam = camEl.object3D, rig = this.el.object3D;
+          // Rotate about the player's position: turn the rig, then shift it so the
+          // camera's world position is unchanged (otherwise it orbits the pivot).
+          const before = new THREE.Vector3(); cam.getWorldPosition(before);
+          rig.rotation.y += d * THREE.MathUtils.degToRad(this.data.speed) * (dt / 1000);
+          const after = new THREE.Vector3(); cam.getWorldPosition(after);
+          rig.position.x -= (after.x - before.x);
+          rig.position.z -= (after.z - before.z);
         },
       });
 
