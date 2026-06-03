@@ -351,10 +351,16 @@
       // Bell-like pings in random gusts, anchored at the spawn point so they
       // fade with distance. Near-zero overhead (short-lived oscillators).
       window.WindChimes = (function () {
-        var ctx, master, comp, panner, running = false, timer = null, muted = false;
-        var VOL = 0.4;                                   // overall level (quiet, ambient)
+        var ctx, master, comp, chimePanner, chimeBus, running = false, timer = null, muted = false;
+        var CHIME_VOL = 0.1;    // chime level
+        var DRONE_VOL = 0.3;    // drone level at its reference distance (the back)
         // E minor pentatonic (B D E G A), high chime register
         var NOTES = [987.77, 1174.66, 1318.51, 1567.98, 1760.00, 1975.53, 2349.32, 2637.02];
+
+        function setPos(node, p) {
+          if (node.positionX) { node.positionX.value = p.x; node.positionY.value = p.y; node.positionZ.value = p.z; }
+          else node.setPosition(p.x, p.y, p.z);
+        }
 
         function ping(freq, when, vel) {
           freq *= 1 + (Math.random() * 2 - 1) * 0.004;   // tiny detune = organic
@@ -363,7 +369,7 @@
           g.gain.setValueAtTime(0.0001, when);
           g.gain.exponentialRampToValueAtTime(vel, when + 0.004 + Math.random() * 0.012);
           g.gain.exponentialRampToValueAtTime(0.0001, when + decay);
-          g.connect(panner);
+          g.connect(chimePanner);
           var partials = [[1, 0.5], [2.01, 0.22], [2.76, 0.12], [5.4, 0.05]]; // inharmonic, tube-like
           for (var i = 0; i < partials.length; i++) {
             var o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq * partials[i][0];
@@ -382,22 +388,48 @@
           timer = setTimeout(gust, 4000 + Math.random() * 7000);  // next gust in 4–11s
         }
 
+        // Continuous low-E drone with slow phasing (detuned voices + amplitude &
+        // filter LFOs), positioned so it swells as you approach its location.
+        function startDrone(pos) {
+          var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420; lp.Q.value = 0.6;
+          var dg = ctx.createGain(); dg.gain.value = DRONE_VOL;
+          var dp = ctx.createPanner(); dp.panningModel = 'HRTF'; dp.distanceModel = 'inverse';
+          dp.refDistance = 8; dp.maxDistance = 140; dp.rolloffFactor = 1.0; setPos(dp, pos);
+          lp.connect(dg); dg.connect(dp); dp.connect(master);
+          // root E1 + octave E2 (detuned twin for beating) + fifth B2 — tuned to E
+          var voices = [[41.20, 'sine', 0.5, 0], [82.41, 'triangle', 0.30, 4], [82.41, 'triangle', 0.30, -5], [123.47, 'sine', 0.16, 3]];
+          for (var i = 0; i < voices.length; i++) {
+            var o = ctx.createOscillator(); o.type = voices[i][1]; o.frequency.value = voices[i][0]; o.detune.value = voices[i][3];
+            var g = ctx.createGain(); g.gain.value = voices[i][2];
+            o.connect(g); g.connect(lp); o.start();
+          }
+          var ampLFO = ctx.createOscillator(); ampLFO.type = 'sine'; ampLFO.frequency.value = 0.07;   // ~14s breathing
+          var ampDepth = ctx.createGain(); ampDepth.gain.value = 0.12;        // dg.gain swells 0.18–0.42
+          ampLFO.connect(ampDepth); ampDepth.connect(dg.gain); ampLFO.start();
+          var filtLFO = ctx.createOscillator(); filtLFO.type = 'sine'; filtLFO.frequency.value = 0.045; // ~22s sweep
+          var filtDepth = ctx.createGain(); filtDepth.gain.value = 180;       // cutoff ±180 Hz
+          filtLFO.connect(filtDepth); filtDepth.connect(lp.frequency); filtLFO.start();
+        }
+
         return {
-          start: function (pos) {
+          start: function (opts) {
             if (running) return;
+            opts = opts || {};
             var AC = window.AudioContext || window.webkitAudioContext;
             if (!AC) return;
             if (!ctx) {
               ctx = new AC();
               master = ctx.createGain(); master.gain.value = 0.0001;
               comp = ctx.createDynamicsCompressor();
-              panner = ctx.createPanner();
-              panner.panningModel = 'HRTF'; panner.distanceModel = 'inverse';
-              panner.refDistance = 5; panner.maxDistance = 100; panner.rolloffFactor = 1.2;
-              var P = pos || { x: 0, y: 2.8, z: 0 };
-              if (panner.positionX) { panner.positionX.value = P.x; panner.positionY.value = P.y; panner.positionZ.value = P.z; }
-              else panner.setPosition(P.x, P.y, P.z);
-              panner.connect(master); master.connect(comp); comp.connect(ctx.destination);
+              master.connect(comp); comp.connect(ctx.destination);
+              // chimes bus, panned at the spawn point
+              chimeBus = ctx.createGain(); chimeBus.gain.value = CHIME_VOL;
+              chimePanner = ctx.createPanner(); chimePanner.panningModel = 'HRTF'; chimePanner.distanceModel = 'inverse';
+              chimePanner.refDistance = 5; chimePanner.maxDistance = 100; chimePanner.rolloffFactor = 1.2;
+              setPos(chimePanner, opts.chimes || { x: 0, y: 2.8, z: 0 });
+              chimePanner.connect(chimeBus); chimeBus.connect(master);
+              // drone, panned at the back of the gallery
+              startDrone(opts.drone || { x: 0, y: 2.8, z: -46 });
               document.addEventListener('visibilitychange', function () {
                 if (!ctx) return;
                 if (document.hidden) ctx.suspend && ctx.suspend(); else if (running) ctx.resume && ctx.resume();
@@ -407,7 +439,7 @@
             running = true;
             master.gain.cancelScheduledValues(ctx.currentTime);
             master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), ctx.currentTime);
-            master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : VOL, ctx.currentTime + 2.5); // gentle fade-in
+            master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : 1.0, ctx.currentTime + 3.0); // gentle fade-in
             gust();
           },
           setListener: function (px, py, pz, fx, fy, fz, ux, uy, uz) {
@@ -421,7 +453,7 @@
           },
           toggle: function () {
             muted = !muted;
-            if (ctx) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : VOL, ctx.currentTime + 0.25); }
+            if (ctx) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : 1.0, ctx.currentTime + 0.25); }
             return muted;
           }
         };
@@ -472,8 +504,10 @@
           if (intro) { intro.classList.remove('hide'); setTimeout(function () { intro.classList.add('hide'); }, 6000); }
 
           if (window.WindChimes) {
-            const sp = (window.GALLERY_DATA && window.GALLERY_DATA.spawn) || { x: 0, z: 0 };
-            WindChimes.start({ x: sp.x, y: 2.8, z: sp.z });   // chimes hang at the spawn point
+            const d = window.GALLERY_DATA || {};
+            const sp = d.spawn || { x: 0, z: 0 };
+            const backZ = (d.bounds && d.bounds.minZ != null) ? d.bounds.minZ + 2 : -46;
+            WindChimes.start({ chimes: { x: sp.x, y: 2.8, z: sp.z }, drone: { x: 0, y: 2.8, z: backZ } });
           }
           const mute = document.getElementById('muteBtn');
           if (mute && window.WindChimes) {
