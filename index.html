@@ -18,6 +18,12 @@
       #intro b { color: #ffd27f; }
       #intro.hide { opacity: 0; }
       #count { position: fixed; z-index: 10; left: 12px; bottom: 10px; color: #aaa; font-size: 12px; }
+      #muteBtn {
+        position: fixed; z-index: 10; right: 12px; bottom: 10px; display: none;
+        width: 40px; height: 34px; font-size: 16px; cursor: pointer; color: #fff;
+        background: rgba(0,0,0,0.45); border: 0; border-radius: 8px; backdrop-filter: blur(4px);
+      }
+      #muteBtn:hover { background: rgba(0,0,0,0.65); }
 
       /* Loading / intro overlay */
       #loader {
@@ -52,6 +58,7 @@
       <b>Drag</b> to look · <b>W A S D</b> / arrows to walk · <b>Q E</b> to turn · headset button for VR
     </div>
     <div id="count"></div>
+    <button id="muteBtn" aria-label="Mute" title="Sound on/off">🔊</button>
 
     <!-- ============================== TWEAKABLES ==============================
          Movement / view
@@ -340,6 +347,67 @@
     </script>
 
     <script>
+      // Procedural wind chimes — synthesized with Web Audio (no audio files).
+      // A few short oscillator "pings" in random gusts; near-zero overhead.
+      window.WindChimes = (function () {
+        var ctx, master, comp, running = false, timer = null, muted = false;
+        var NOTES = [493.88, 554.37, 659.25, 739.99, 880.00, 987.77, 1108.73, 1318.51]; // pentatonic, chime register
+
+        function ping(freq, when, vel) {
+          var g = ctx.createGain();
+          g.gain.setValueAtTime(0.0001, when);
+          g.gain.exponentialRampToValueAtTime(vel, when + 0.006);   // fast strike
+          g.gain.exponentialRampToValueAtTime(0.0001, when + 3.0);  // long decay
+          if (ctx.createStereoPanner) { var pan = ctx.createStereoPanner(); pan.pan.value = (Math.random() * 2 - 1) * 0.6; g.connect(pan); pan.connect(master); }
+          else g.connect(master);
+          var partials = [[1, 0.6], [2.01, 0.25], [2.76, 0.12]];     // slight inharmonicity = bell-like
+          for (var i = 0; i < partials.length; i++) {
+            var o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq * partials[i][0];
+            var og = ctx.createGain(); og.gain.value = partials[i][1];
+            o.connect(og); og.connect(g);
+            o.start(when); o.stop(when + 3.1);
+          }
+        }
+
+        function gust() {
+          if (!running) return;
+          var n = 1 + Math.floor(Math.random() * 4), t = ctx.currentTime + 0.05;
+          for (var i = 0; i < n; i++) ping(NOTES[Math.floor(Math.random() * NOTES.length)], t + Math.random() * 0.4, 0.04 + Math.random() * 0.06);
+          timer = setTimeout(gust, 2500 + Math.random() * 6000);    // next gust in 2.5–8.5s
+        }
+
+        return {
+          start: function () {
+            if (running) return;
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            if (!ctx) {
+              ctx = new AC();
+              master = ctx.createGain(); master.gain.value = 0.0001;
+              comp = ctx.createDynamicsCompressor();
+              master.connect(comp); comp.connect(ctx.destination);
+              document.addEventListener('visibilitychange', function () {
+                if (!ctx) return;
+                if (document.hidden) ctx.suspend && ctx.suspend(); else if (running) ctx.resume && ctx.resume();
+              });
+            }
+            ctx.resume && ctx.resume();
+            running = true;
+            master.gain.cancelScheduledValues(ctx.currentTime);
+            master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), ctx.currentTime);
+            master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : 0.7, ctx.currentTime + 2.0); // gentle fade-in
+            gust();
+          },
+          toggle: function () {
+            muted = !muted;
+            if (ctx) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : 0.7, ctx.currentTime + 0.25); }
+            return muted;
+          }
+        };
+      })();
+    </script>
+
+    <script>
       // Loading screen: enable Start only when assets + room are ready.
       (function () {
         const scene = document.querySelector('a-scene');
@@ -367,6 +435,17 @@
           setTimeout(function () { loader.style.display = 'none'; }, 650);
           const intro = document.getElementById('intro');
           if (intro) { intro.classList.remove('hide'); setTimeout(function () { intro.classList.add('hide'); }, 6000); }
+
+          if (window.WindChimes) WindChimes.start();
+          const mute = document.getElementById('muteBtn');
+          if (mute && window.WindChimes) {
+            mute.style.display = 'block';
+            mute.addEventListener('click', function () {
+              const m = WindChimes.toggle();
+              mute.textContent = m ? '🔇' : '🔊';
+              mute.setAttribute('aria-label', m ? 'Unmute' : 'Mute');
+            });
+          }
         });
       })();
     </script>
