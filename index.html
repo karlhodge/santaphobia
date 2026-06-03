@@ -111,7 +111,7 @@
 
       <!-- Visitor -->
       <a-entity id="rig" key-turn>
-        <a-camera position="0 2.0 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 25; fly: false" wall-collider="buffer: 0.4"></a-camera>
+        <a-camera position="0 2.0 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 25; fly: false" wall-collider="buffer: 0.4" chime-listener></a-camera>
       </a-entity>
     </a-scene>
 
@@ -348,36 +348,42 @@
 
     <script>
       // Procedural wind chimes — synthesized with Web Audio (no audio files).
-      // A few short oscillator "pings" in random gusts; near-zero overhead.
+      // Bell-like pings in random gusts, anchored at the spawn point so they
+      // fade with distance. Near-zero overhead (short-lived oscillators).
       window.WindChimes = (function () {
-        var ctx, master, comp, running = false, timer = null, muted = false;
-        var NOTES = [493.88, 554.37, 659.25, 739.99, 880.00, 987.77, 1108.73, 1318.51]; // pentatonic, chime register
+        var ctx, master, comp, panner, running = false, timer = null, muted = false;
+        var VOL = 0.4;                                   // overall level (quiet, ambient)
+        // E minor pentatonic (B D E G A), high chime register
+        var NOTES = [987.77, 1174.66, 1318.51, 1567.98, 1760.00, 1975.53, 2349.32, 2637.02];
 
         function ping(freq, when, vel) {
+          freq *= 1 + (Math.random() * 2 - 1) * 0.004;   // tiny detune = organic
+          var decay = 6 + Math.random() * 4;             // long, varied decay (6–10s)
           var g = ctx.createGain();
           g.gain.setValueAtTime(0.0001, when);
-          g.gain.exponentialRampToValueAtTime(vel, when + 0.006);   // fast strike
-          g.gain.exponentialRampToValueAtTime(0.0001, when + 3.0);  // long decay
-          if (ctx.createStereoPanner) { var pan = ctx.createStereoPanner(); pan.pan.value = (Math.random() * 2 - 1) * 0.6; g.connect(pan); pan.connect(master); }
-          else g.connect(master);
-          var partials = [[1, 0.6], [2.01, 0.25], [2.76, 0.12]];     // slight inharmonicity = bell-like
+          g.gain.exponentialRampToValueAtTime(vel, when + 0.004 + Math.random() * 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0001, when + decay);
+          g.connect(panner);
+          var partials = [[1, 0.5], [2.01, 0.22], [2.76, 0.12], [5.4, 0.05]]; // inharmonic, tube-like
           for (var i = 0; i < partials.length; i++) {
             var o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = freq * partials[i][0];
             var og = ctx.createGain(); og.gain.value = partials[i][1];
             o.connect(og); og.connect(g);
-            o.start(when); o.stop(when + 3.1);
+            o.start(when); o.stop(when + decay + 0.2);
           }
         }
 
         function gust() {
           if (!running) return;
-          var n = 1 + Math.floor(Math.random() * 4), t = ctx.currentTime + 0.05;
-          for (var i = 0; i < n; i++) ping(NOTES[Math.floor(Math.random() * NOTES.length)], t + Math.random() * 0.4, 0.04 + Math.random() * 0.06);
-          timer = setTimeout(gust, 2500 + Math.random() * 6000);    // next gust in 2.5–8.5s
+          var n = 8 + Math.floor(Math.random() * 5);     // 8–12 notes
+          var t = ctx.currentTime + 0.05;
+          var spread = 0.7 + Math.random() * 1.6;        // scattered over the gust (organic)
+          for (var i = 0; i < n; i++) ping(NOTES[Math.floor(Math.random() * NOTES.length)], t + Math.random() * spread, 0.015 + Math.random() * 0.025);
+          timer = setTimeout(gust, 4000 + Math.random() * 7000);  // next gust in 4–11s
         }
 
         return {
-          start: function () {
+          start: function (pos) {
             if (running) return;
             var AC = window.AudioContext || window.webkitAudioContext;
             if (!AC) return;
@@ -385,7 +391,13 @@
               ctx = new AC();
               master = ctx.createGain(); master.gain.value = 0.0001;
               comp = ctx.createDynamicsCompressor();
-              master.connect(comp); comp.connect(ctx.destination);
+              panner = ctx.createPanner();
+              panner.panningModel = 'HRTF'; panner.distanceModel = 'inverse';
+              panner.refDistance = 5; panner.maxDistance = 100; panner.rolloffFactor = 1.2;
+              var P = pos || { x: 0, y: 2.8, z: 0 };
+              if (panner.positionX) { panner.positionX.value = P.x; panner.positionY.value = P.y; panner.positionZ.value = P.z; }
+              else panner.setPosition(P.x, P.y, P.z);
+              panner.connect(master); master.connect(comp); comp.connect(ctx.destination);
               document.addEventListener('visibilitychange', function () {
                 if (!ctx) return;
                 if (document.hidden) ctx.suspend && ctx.suspend(); else if (running) ctx.resume && ctx.resume();
@@ -395,16 +407,39 @@
             running = true;
             master.gain.cancelScheduledValues(ctx.currentTime);
             master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), ctx.currentTime);
-            master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : 0.7, ctx.currentTime + 2.0); // gentle fade-in
+            master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : VOL, ctx.currentTime + 2.5); // gentle fade-in
             gust();
+          },
+          setListener: function (px, py, pz, fx, fy, fz, ux, uy, uz) {
+            if (!ctx) return;
+            var L = ctx.listener;
+            if (L.positionX) {
+              L.positionX.value = px; L.positionY.value = py; L.positionZ.value = pz;
+              L.forwardX.value = fx; L.forwardY.value = fy; L.forwardZ.value = fz;
+              L.upX.value = ux; L.upY.value = uy; L.upZ.value = uz;
+            } else { L.setPosition && L.setPosition(px, py, pz); L.setOrientation && L.setOrientation(fx, fy, fz, ux, uy, uz); }
           },
           toggle: function () {
             muted = !muted;
-            if (ctx) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : 0.7, ctx.currentTime + 0.25); }
+            if (ctx) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.exponentialRampToValueAtTime(muted ? 0.0001 : VOL, ctx.currentTime + 0.25); }
             return muted;
           }
         };
       })();
+
+      // chime-listener: keep the Web Audio listener on the camera so the chimes
+      // (anchored at the spawn point) attenuate as you walk away.
+      AFRAME.registerComponent('chime-listener', {
+        init: function () { this._p = new THREE.Vector3(); this._q = new THREE.Quaternion(); this._f = new THREE.Vector3(); this._u = new THREE.Vector3(); },
+        tick: function () {
+          if (!window.WindChimes) return;
+          var o = this.el.object3D;
+          o.getWorldPosition(this._p); o.getWorldQuaternion(this._q);
+          this._f.set(0, 0, -1).applyQuaternion(this._q);
+          this._u.set(0, 1, 0).applyQuaternion(this._q);
+          WindChimes.setListener(this._p.x, this._p.y, this._p.z, this._f.x, this._f.y, this._f.z, this._u.x, this._u.y, this._u.z);
+        },
+      });
     </script>
 
     <script>
@@ -436,7 +471,10 @@
           const intro = document.getElementById('intro');
           if (intro) { intro.classList.remove('hide'); setTimeout(function () { intro.classList.add('hide'); }, 6000); }
 
-          if (window.WindChimes) WindChimes.start();
+          if (window.WindChimes) {
+            const sp = (window.GALLERY_DATA && window.GALLERY_DATA.spawn) || { x: 0, z: 0 };
+            WindChimes.start({ x: sp.x, y: 2.8, z: sp.z });   // chimes hang at the spawn point
+          }
           const mute = document.getElementById('muteBtn');
           if (mute && window.WindChimes) {
             mute.style.display = 'block';
