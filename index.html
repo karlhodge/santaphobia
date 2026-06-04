@@ -72,23 +72,23 @@
     // ─── Boot messages ────────────────────────────────────────────────────────
     const BOOT_LINES = [
       { text: "SPODGOD SYSTEMS BIOS v2.41", delay: 0 },
-      { text: "Copyright (C) 1994-2026 Spodgod Corp.", delay: 80 },
-      { text: "", delay: 120 },
-      { text: "CPU: SPODGOD 486DX2-66 ... OK", delay: 200 },
-      { text: "Memory Test: 640K Base ... OK", delay: 180 },
-      { text: "Memory Test: 8192K Extended ... OK", delay: 220 },
+      { text: "Copyright (C) 1994-2026 Spodgod Corp.", delay: 40 },
+      { text: "", delay: 60 },
+      { text: "CPU: SPODGOD 486DX2-66 ... OK", delay: 100 },
+      { text: "Memory Test: 640K Base ... OK", delay: 90 },
+      { text: "Memory Test: 8192K Extended ... OK", delay: 110 },
+      { text: "", delay: 50 },
+      { text: "Detecting primary master ... ST31270A", delay: 125 },
+      { text: "Detecting primary slave  ... None", delay: 90 },
+      { text: "", delay: 50 },
+      { text: "Loading MS-DOS ...", delay: 150 },
+      { text: "", delay: 40 },
+      { text: "Microsoft(R) MS-DOS(R) Version 6.22", delay: 80 },
+      { text: "(C)Copyright Microsoft Corp 1981-1994", delay: 40 },
+      { text: "", delay: 60 },
+      { text: "HIMEM is testing extended memory...done.", delay: 140 },
+      { text: "SMARTDRV installed.", delay: 80 },
       { text: "", delay: 100 },
-      { text: "Detecting primary master ... ST31270A", delay: 250 },
-      { text: "Detecting primary slave  ... None", delay: 180 },
-      { text: "", delay: 100 },
-      { text: "Loading MS-DOS ...", delay: 300 },
-      { text: "", delay: 80 },
-      { text: "Microsoft(R) MS-DOS(R) Version 6.22", delay: 160 },
-      { text: "(C)Copyright Microsoft Corp 1981-1994", delay: 80 },
-      { text: "", delay: 120 },
-      { text: "HIMEM is testing extended memory...done.", delay: 280 },
-      { text: "SMARTDRV installed.", delay: 160 },
-      { text: "", delay: 200 },
     ];
 
     // ─── Renderer ─────────────────────────────────────────────────────────────
@@ -133,8 +133,8 @@
       }
 
       // Prompt appears
-      await appendLine("", 300);
-      totalDelay += 400;
+      await appendLine("", 150);
+      totalDelay += 200;
 
       setTimeout(async () => {
         // Type the prompt and DIR command
@@ -142,9 +142,9 @@
         screen.appendChild(promptLine);
         promptLine.textContent = "C:\\> ";
 
-        await typeText("DIR", 90, promptLine);
+        await typeText("DIR", 45, promptLine);
 
-        await new Promise(r => setTimeout(r, 350));
+        await new Promise(r => setTimeout(r, 175));
 
         // DIR output header
         const header =
@@ -155,7 +155,7 @@
         screen.innerHTML += header;
 
         // Date/time column widths match classic DOS DIR
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 100));
 
         // Render each directory entry with a slight stagger
         for (let i = 0; i < DIRECTORY.length; i++) {
@@ -169,16 +169,16 @@
             `${entry.date}  12:00p   ${entry.size}  ${entry.name}`;
           line.appendChild(link);
           screen.appendChild(line);
-          await new Promise(r => setTimeout(r, 120));
+          await new Promise(r => setTimeout(r, 60));
         }
 
-        await new Promise(r => setTimeout(r, 250));
+        await new Promise(r => setTimeout(r, 125));
 
         // Footer
         screen.innerHTML +=
           `\n         ${DIRECTORY.length} Dir(s)     1,234,567,890 bytes free\n`;
 
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 200));
 
         // Final prompt with blinking cursor
         const finalLine = document.createElement("div");
