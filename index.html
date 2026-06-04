@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPODGOD SYSTEMS</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #000;
+      color: #33ff33;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 16px;
+      line-height: 1.5;
+      min-height: 100vh;
+      padding: 24px 32px 60px;
+      overflow-x: hidden;
+    }
+
+    #screen {
+      max-width: 780px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .dim { color: #1a8c1a; }
+    .bright { color: #66ff66; font-weight: bold; }
+
+    .dir-entry {
+      display: block;
+      color: #33ff33;
+      text-decoration: none;
+      padding: 0;
+    }
+    .dir-entry:hover { color: #99ff99; text-decoration: underline; }
+
+    #cursor {
+      display: inline-block;
+      width: 9px;
+      height: 1em;
+      background: #33ff33;
+      vertical-align: text-bottom;
+      animation: blink 0.75s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    #copyright {
+      position: fixed;
+      bottom: 14px;
+      left: 24px;
+      color: #555;
+      font-size: 12px;
+      font-family: "Courier New", Courier, monospace;
+    }
+  </style>
+</head>
+<body>
+  <div id="screen"></div>
+  <div id="copyright">Copyright &copy; Spodgod. All rights reserved.</div>
+
+  <script>
+    // ─── Directory listing ────────────────────────────────────────────────────
+    // To add or edit items, modify this array.
+    // Each entry: { name, size, date, url }
+    const DIRECTORY = [
+      { name: "GALLERY    ", size: "      <DIR>", date: "04-06-2026", url: "/gallery/" },
+      { name: "STUDIO     ", size: "      <DIR>", date: "04-06-2026", url: "/studio/" },
+      { name: "REPORTER   ", size: "      <DIR>", date: "04-06-2026", url: "/reporter/" },
+    ];
+
+    // ─── Boot messages ────────────────────────────────────────────────────────
+    const BOOT_LINES = [
+      { text: "SPODGOD SYSTEMS BIOS v2.41", delay: 0 },
+      { text: "Copyright (C) 1994-2026 Spodgod Corp.", delay: 80 },
+      { text: "", delay: 120 },
+      { text: "CPU: SPODGOD 486DX2-66 ... OK", delay: 200 },
+      { text: "Memory Test: 640K Base ... OK", delay: 180 },
+      { text: "Memory Test: 8192K Extended ... OK", delay: 220 },
+      { text: "", delay: 100 },
+      { text: "Detecting primary master ... ST31270A", delay: 250 },
+      { text: "Detecting primary slave  ... None", delay: 180 },
+      { text: "", delay: 100 },
+      { text: "Loading MS-DOS ...", delay: 300 },
+      { text: "", delay: 80 },
+      { text: "Microsoft(R) MS-DOS(R) Version 6.22", delay: 160 },
+      { text: "(C)Copyright Microsoft Corp 1981-1994", delay: 80 },
+      { text: "", delay: 120 },
+      { text: "HIMEM is testing extended memory...done.", delay: 280 },
+      { text: "SMARTDRV installed.", delay: 160 },
+      { text: "", delay: 200 },
+    ];
+
+    // ─── Renderer ─────────────────────────────────────────────────────────────
+    const screen = document.getElementById("screen");
+    let totalDelay = 0;
+
+    function appendLine(html, delayBefore = 0) {
+      totalDelay += delayBefore;
+      return new Promise(resolve => {
+        setTimeout(() => {
+          screen.innerHTML += html + "\n";
+          resolve();
+        }, totalDelay);
+      });
+    }
+
+    function typeText(text, charDelay, container) {
+      return new Promise(resolve => {
+        let i = 0;
+        const cursor = document.createElement("span");
+        cursor.id = "cursor";
+        container.appendChild(cursor);
+
+        function next() {
+          if (i < text.length) {
+            cursor.before(document.createTextNode(text[i]));
+            i++;
+            setTimeout(next, charDelay + Math.random() * charDelay * 0.4);
+          } else {
+            cursor.remove();
+            resolve();
+          }
+        }
+        next();
+      });
+    }
+
+    async function run() {
+      // Boot sequence
+      for (const line of BOOT_LINES) {
+        await appendLine(`<span class="dim">${escHtml(line.text)}</span>`, line.delay);
+      }
+
+      // Prompt appears
+      await appendLine("", 300);
+      totalDelay += 400;
+
+      setTimeout(async () => {
+        // Type the prompt and DIR command
+        const promptLine = document.createElement("div");
+        screen.appendChild(promptLine);
+        promptLine.textContent = "C:\\> ";
+
+        await typeText("DIR", 90, promptLine);
+
+        await new Promise(r => setTimeout(r, 350));
+
+        // DIR output header
+        const header =
+          `\n Volume in drive C is SPODGOD\n` +
+          ` Volume Serial Number is 1A4F-9B2E\n` +
+          `\n Directory of C:\\\n\n`;
+
+        screen.innerHTML += header;
+
+        // Date/time column widths match classic DOS DIR
+        await new Promise(r => setTimeout(r, 200));
+
+        // Render each directory entry with a slight stagger
+        for (let i = 0; i < DIRECTORY.length; i++) {
+          const entry = DIRECTORY[i];
+          const line = document.createElement("div");
+          line.style.marginLeft = "1ch";
+          const link = document.createElement("a");
+          link.className = "dir-entry";
+          link.href = entry.url;
+          link.textContent =
+            `${entry.date}  12:00p   ${entry.size}  ${entry.name}`;
+          line.appendChild(link);
+          screen.appendChild(line);
+          await new Promise(r => setTimeout(r, 120));
+        }
+
+        await new Promise(r => setTimeout(r, 250));
+
+        // Footer
+        screen.innerHTML +=
+          `\n         ${DIRECTORY.length} Dir(s)     1,234,567,890 bytes free\n`;
+
+        await new Promise(r => setTimeout(r, 400));
+
+        // Final prompt with blinking cursor
+        const finalLine = document.createElement("div");
+        finalLine.innerHTML = 'C:\\> <span id="cursor"></span>';
+        screen.appendChild(finalLine);
+
+      }, totalDelay);
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    run();
+  </script>
+</body>
+</html>
