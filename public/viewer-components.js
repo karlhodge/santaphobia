@@ -1,8 +1,9 @@
 /* Shared A-Frame components for World Viewer navigation */
 
 function registerViewerComponents() {
-// Q/E key rotation pivoting around the camera (not the body axis)
+// Q/E turn + R/F vertical movement on the rig
 AFRAME.registerComponent('key-turn', {
+  schema: { verticalEnabled: { default: false } },
   init() {
     this.keys = {};
     this.onKey = (e, down) => { this.keys[e.code] = down; };
@@ -10,9 +11,15 @@ AFRAME.registerComponent('key-turn', {
     document.addEventListener('keyup',  e => this.onKey(e, false));
   },
   tick(t, dt) {
-    const speed = 60; // deg/s
-    if (this.keys['KeyQ']) this.el.object3D.rotation.y += THREE.MathUtils.degToRad(speed * dt / 1000);
-    if (this.keys['KeyE']) this.el.object3D.rotation.y -= THREE.MathUtils.degToRad(speed * dt / 1000);
+    const turnSpeed = 60;   // deg/s
+    const moveSpeed = 4;    // m/s
+    const sec = dt / 1000;
+    if (this.keys['KeyQ']) this.el.object3D.rotation.y += THREE.MathUtils.degToRad(turnSpeed * sec);
+    if (this.keys['KeyE']) this.el.object3D.rotation.y -= THREE.MathUtils.degToRad(turnSpeed * sec);
+    if (this.data.verticalEnabled) {
+      if (this.keys['KeyR']) this.el.object3D.position.y += moveSpeed * sec;
+      if (this.keys['KeyF']) this.el.object3D.position.y -= moveSpeed * sec;
+    }
   },
 });
 

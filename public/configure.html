@@ -440,7 +440,7 @@
     vr-mode-ui="enabled: false">
     <a-assets timeout="60000"></a-assets>
     <a-sky id="sky" radius="4000"></a-sky>
-    <a-entity id="rig" position="0 0 5" key-turn>
+    <a-entity id="rig" position="0 0 5" key-turn="verticalEnabled: true">
       <a-camera id="camera"
         position="0 1.7 0"
         look-controls="pointerLockEnabled: true; magicWindowTrackingEnabled: false; reverseMouseDrag: false"
@@ -451,7 +451,7 @@
   </a-scene>
 </div>
 
-<div id="controls-hint">WASD + mouse · Q/E turn · click scene to lock mouse</div>
+<div id="controls-hint">WASD + mouse · Q/E turn · R/F up/down · click scene to lock mouse</div>
 
 <script>
 (async function () {
