@@ -126,14 +126,21 @@
   <script>
     // ─── Directory listing ────────────────────────────────────────────────────
     // Add or edit entries here. name must be padded to consistent width.
+    function randDate() {
+      const y = 2024 + Math.floor(Math.random() * 3);
+      const m = 1  + Math.floor(Math.random() * 12);
+      const d = 1  + Math.floor(Math.random() * 28);
+      return `${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}-${y}`;
+    }
+
     const DIRECTORY = [
-      { name: "ABOUT    ", size: "      <DIR>", date: "04-06-2026", text:
+      { name: "ABOUT    ", size: "      <DIR>", date: randDate(), text:
           "Beermat Doodles is the home of web toys developed by journalist and\n" +
           "lecturer Dr Karl Hodge. Select or type the name of a toy you want to\n" +
           "play with." },
-      { name: "GALLERY  ", size: "      <DIR>", date: "04-06-2026", url: "/gallery/" },
-      { name: "STUDIO   ", size: "      <DIR>", date: "04-06-2026", url: "/studio/" },
-      { name: "REPORTER ", size: "      <DIR>", date: "04-06-2026", url: "/reporter/" },
+      { name: "GALLERY  ", size: "      <DIR>", date: randDate(), url: "/gallery/" },
+      { name: "STUDIO   ", size: "      <DIR>", date: randDate(), url: "/studio/" },
+      { name: "REPORTER ", size: "      <DIR>", date: randDate(), url: "/reporter/" },
     ];
 
     // ─── Boot messages ────────────────────────────────────────────────────────
