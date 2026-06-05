@@ -544,6 +544,9 @@ Press any key to continue _`;
           span.style.cursor = "pointer";
           span.textContent = label;
           span.addEventListener("click", () => {
+            // Remove the active prompt if one exists
+            const activeInput = screen.querySelector("input");
+            if (activeInput) activeInput.closest("div").remove();
             entry.text.split("\n").forEach(line => {
               const el = document.createElement("div");
               el.textContent = line;
