@@ -35,7 +35,6 @@
     }
     #configure-link:hover { color: rgba(200,190,255,0.9); }
 
-    /* Loading */
     #loading-screen {
       position: fixed; inset: 0; background: #0d0d1a;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -51,7 +50,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     #loading-screen p { font-size: 0.9rem; }
 
-    /* Welcome overlay */
     #welcome-overlay {
       position: fixed; inset: 0; z-index: 150;
       background: rgba(5,5,18,0.88); backdrop-filter: blur(8px);
@@ -61,46 +59,27 @@
       padding: 2rem; text-align: center;
     }
     #welcome-overlay.hidden { display: none; }
-    #welcome-title {
-      font-size: 2rem; font-weight: 300; color: #c0b8ff;
-      letter-spacing: 0.08em; margin-bottom: 1rem;
-    }
-    #welcome-body {
-      font-size: 1rem; color: #8080b0; line-height: 1.7;
-      max-width: 520px; margin-bottom: 2rem; white-space: pre-wrap;
-    }
-    #welcome-enter {
-      background: #4040cc; color: #fff; border: none;
-      border-radius: 8px; padding: 0.75rem 2.5rem;
-      font-size: 1rem; cursor: pointer; transition: background 0.2s;
-    }
+    #welcome-title { font-size: 2rem; font-weight: 300; color: #c0b8ff; letter-spacing: 0.08em; margin-bottom: 1rem; }
+    #welcome-body  { font-size: 1rem; color: #8080b0; line-height: 1.7; max-width: 520px; margin-bottom: 2rem; white-space: pre-wrap; }
+    #welcome-enter { background: #4040cc; color: #fff; border: none; border-radius: 8px; padding: 0.75rem 2.5rem; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
     #welcome-enter:hover { background: #5050e0; }
 
-    /* Hotspot popup */
     #hotspot-popup {
       position: fixed; bottom: 4rem; left: 50%; transform: translateX(-50%);
       z-index: 110; background: rgba(10,10,28,0.92); backdrop-filter: blur(8px);
       border: 1px solid #3030a0; border-radius: 10px;
       padding: 1rem 1.4rem; max-width: 340px; width: 90%;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      transition: opacity 0.2s;
+      font-family: 'Segoe UI', system-ui, sans-serif; transition: opacity 0.2s;
     }
     #hotspot-popup.hidden { opacity: 0; pointer-events: none; }
     #hotspot-popup-label { font-size: 0.95rem; color: #c0b8ff; font-weight: 600; margin-bottom: 0.4rem; }
     #hotspot-popup-body  { font-size: 0.85rem; color: #8080b0; line-height: 1.5; white-space: pre-wrap; }
-    #hotspot-popup-close {
-      position: absolute; top: 0.5rem; right: 0.7rem;
-      background: none; border: none; color: #4040a0;
-      cursor: pointer; font-size: 1rem; transition: color 0.15s;
-    }
+    #hotspot-popup-close { position: absolute; top: 0.5rem; right: 0.7rem; background: none; border: none; color: #4040a0; cursor: pointer; font-size: 1rem; }
     #hotspot-popup-close:hover { color: #c0b8ff; }
   </style>
 </head>
 <body>
-  <div id="loading-screen">
-    <div class="loader-spinner"></div>
-    <p>Loading world…</p>
-  </div>
+  <div id="loading-screen"><div class="loader-spinner"></div><p>Loading world…</p></div>
 
   <div id="welcome-overlay" class="hidden">
     <div id="welcome-title"></div>
@@ -110,10 +89,7 @@
 
   <div id="ui-overlay">
     <div id="world-title"></div>
-    <div id="controls-hint">
-      WASD · mouse drag to look<br>
-      Q / E to turn · click to lock mouse
-    </div>
+    <div id="controls-hint">WASD · mouse drag to look<br>Q / E to turn · click to lock mouse</div>
   </div>
 
   <a id="configure-link" href="#" title="Edit this world">⚙ Configure</a>
@@ -126,6 +102,7 @@
 
   <a-scene id="scene"
     loading-screen="enabled: false"
+    light="defaultLightsEnabled: false"
     renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; toneMappingExposure: 1.15"
     vr-mode-ui="enabled: true">
 
@@ -166,82 +143,66 @@
     const rig    = document.getElementById('rig');
     const camera = document.getElementById('camera');
 
-    // ── Navigation ─────────────────────────────────────────────────────────
-    const nav = config.navigation || {};
+    // ── Navigation & spawn — safe to apply immediately via attributes ──────
+    const nav  = config.navigation || {};
     const eyeH = nav.eyeHeight ?? 1.7;
-    const speed = nav.speed ?? 20;
-    camera.setAttribute('position', `0 ${eyeH} 0`);
-    camera.setAttribute('wasd-controls', `acceleration: ${speed}; fly: false`);
+    camera.setAttribute('position',      `0 ${eyeH} 0`);
+    camera.setAttribute('wasd-controls', `acceleration: ${nav.speed ?? 20}; fly: false`);
     camera.setAttribute('look-controls',
       `pointerLockEnabled: true; magicWindowTrackingEnabled: false; reverseMouseDrag: ${nav.invertY ?? false}`);
     camera.setAttribute('wall-collider', `distance: 0.5; enabled: ${nav.collision !== false}`);
 
-    // ── Spawn ──────────────────────────────────────────────────────────────
     const sp = config.spawn || { x: 0, y: 0, z: 5 };
     rig.setAttribute('position', `${sp.x} ${sp.y} ${sp.z}`);
-    const rotY = config.spawnRotY ?? 0;
-    if (rotY) rig.setAttribute('rotation', `0 ${rotY} 0`);
+    if (config.spawnRotY) rig.setAttribute('rotation', `0 ${config.spawnRotY} 0`);
 
-    // ── Renderer ───────────────────────────────────────────────────────────
     const rend = config.renderer || {};
-    if (!rend.vrEnabled) {
-      scene.setAttribute('vr-mode-ui', 'enabled: false');
+    if (!rend.vrEnabled) scene.setAttribute('vr-mode-ui', 'enabled: false');
+
+    // ── Environment — must wait for scene to initialise ───────────────────
+    function initEnvironment() {
+      applySkybox(config.skybox);
+      applyFog(config.fog);
+      applyLighting(config.lighting);
+      if (scene.renderer) scene.renderer.toneMappingExposure = rend.exposure ?? 1.15;
     }
 
-    // ── Skybox ─────────────────────────────────────────────────────────────
-    applySkybox(config.skybox);
+    if (scene.hasLoaded) initEnvironment();
+    else scene.addEventListener('loaded', initEnvironment, { once: true });
 
-    // ── Fog ────────────────────────────────────────────────────────────────
-    const fog = config.fog || {};
-    if (fog.enabled) {
-      scene.setAttribute('fog', `type: exponential; color: ${fog.color}; density: ${fog.density}`);
-    }
-
-    // ── Lighting ───────────────────────────────────────────────────────────
-    applyLighting(config.lighting);
-
-    // ── Model ──────────────────────────────────────────────────────────────
+    // ── Model ─────────────────────────────────────────────────────────────
     const mdl = config.model || {};
-    const s   = mdl.scale    ?? 1;
-    const yo  = mdl.yOffset  ?? 0;
-    const yr  = mdl.yRotation ?? 0;
-
-    // modelFile may be a plain filename or a subpath (e.g. "scene/scene.gltf")
     const modelPath = config.modelFile
       ? `/api/worlds/${slug}/files/${config.modelFile}`
       : `/api/worlds/${slug}/files/model.glb`;
 
     const modelEl = document.createElement('a-entity');
     modelEl.setAttribute('gltf-model', modelPath);
-    modelEl.setAttribute('scale',    `${s} ${s} ${s}`);
-    modelEl.setAttribute('position', `0 ${yo} 0`);
-    modelEl.setAttribute('rotation', `0 ${yr} 0`);
+    modelEl.setAttribute('scale',    `${mdl.scale ?? 1} ${mdl.scale ?? 1} ${mdl.scale ?? 1}`);
+    modelEl.setAttribute('position', `0 ${mdl.yOffset ?? 0} 0`);
+    modelEl.setAttribute('rotation', `0 ${mdl.yRotation ?? 0} 0`);
     modelEl.setAttribute('sharp-texture', '');
     scene.appendChild(modelEl);
 
     modelEl.addEventListener('model-loaded', () => {
-      // Apply exposure after renderer is ready
+      // Re-apply exposure now the renderer has done its first render
       if (scene.renderer) scene.renderer.toneMappingExposure = rend.exposure ?? 1.15;
       hideLoading();
       showWelcome();
     });
     setTimeout(() => { hideLoading(); showWelcome(); }, 15000);
 
-    // ── Hotspots ───────────────────────────────────────────────────────────
-    const hotspots = config.hotspots || [];
+    // ── Hotspots ──────────────────────────────────────────────────────────
     const popup      = document.getElementById('hotspot-popup');
     const popupLabel = document.getElementById('hotspot-popup-label');
     const popupBody  = document.getElementById('hotspot-popup-body');
     document.getElementById('hotspot-popup-close').addEventListener('click', () =>
       popup.classList.add('hidden'));
 
-    hotspots.forEach(hs => {
+    (config.hotspots || []).forEach(hs => {
       if (!hs.position) return;
       const el = document.createElement('a-entity');
       el.setAttribute('position', `${hs.position.x} ${hs.position.y} ${hs.position.z}`);
-      el.setAttribute('look-at', '[camera]');
-
-      // Sphere marker
       const sphere = document.createElement('a-sphere');
       sphere.setAttribute('radius', '0.1');
       sphere.setAttribute('color',  '#6060ff');
@@ -253,21 +214,17 @@
         popup.classList.remove('hidden');
       });
       el.appendChild(sphere);
-
-      // Label text
       const txt = document.createElement('a-text');
-      txt.setAttribute('value',      hs.label || '');
-      txt.setAttribute('align',      'center');
-      txt.setAttribute('color',      '#c0b8ff');
-      txt.setAttribute('position',   '0 0.22 0');
-      txt.setAttribute('width',      '2');
-      txt.setAttribute('wrap-count', '20');
+      txt.setAttribute('value',    hs.label || '');
+      txt.setAttribute('align',    'center');
+      txt.setAttribute('color',    '#c0b8ff');
+      txt.setAttribute('position', '0 0.22 0');
+      txt.setAttribute('width',    '2');
       el.appendChild(txt);
-
       scene.appendChild(el);
     });
 
-    // ── Welcome screen ─────────────────────────────────────────────────────
+    // ── Welcome ───────────────────────────────────────────────────────────
     const wel = config.welcome || {};
     function showWelcome() {
       if (!wel.enabled || !wel.title) return;
@@ -276,9 +233,8 @@
       document.getElementById('welcome-body').textContent  = wel.body || '';
       document.getElementById('welcome-enter').textContent = wel.buttonLabel || 'Enter';
       overlay.classList.remove('hidden');
-      document.getElementById('welcome-enter').addEventListener('click', () => {
-        overlay.classList.add('hidden');
-      }, { once: true });
+      document.getElementById('welcome-enter').addEventListener('click', () =>
+        overlay.classList.add('hidden'), { once: true });
     }
 
     function hideLoading() {
@@ -288,70 +244,78 @@
       setTimeout(() => ls.remove(), 900);
     }
 
-    // ── Sky helpers ────────────────────────────────────────────────────────
+    // ── Sky ───────────────────────────────────────────────────────────────
     function applySkybox(skybox) {
       const sky = document.getElementById('sky');
-      if (!skybox || skybox.type === 'gradient') {
-        const top = skybox?.topColor  || '#1a1a2e';
-        const bot = skybox?.bottomColor || '#16213e';
-        applyGradientSky(sky, top, bot);
-      } else if (skybox.type === 'solid') {
-        sky.setAttribute('color', skybox.color);
-      } else if (skybox.type === 'image' && skybox.url) {
-        sky.setAttribute('src', skybox.url);
-      } else if (skybox.type === 'none') {
+      const type = skybox?.type || 'gradient';
+      if (type === 'gradient') {
+        sky.setAttribute('src',     gradientDataURL(skybox?.topColor || '#1a1a2e', skybox?.bottomColor || '#16213e'));
+        sky.setAttribute('color',   '#ffffff');
+        sky.setAttribute('visible', 'true');
+      } else if (type === 'solid') {
+        sky.removeAttribute('src');
+        sky.setAttribute('color',   skybox.color || '#000000');
+        sky.setAttribute('visible', 'true');
+      } else if (type === 'image' && skybox.url) {
+        sky.setAttribute('src',     skybox.url);
+        sky.setAttribute('color',   '#ffffff');
+        sky.setAttribute('visible', 'true');
+      } else {
         sky.setAttribute('visible', 'false');
       }
     }
 
-    function applyGradientSky(skyEl, top, bot) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 2; canvas.height = 512;
-      const ctx = canvas.getContext('2d');
-      const grd = ctx.createLinearGradient(0, 0, 0, 512);
-      grd.addColorStop(0, top); grd.addColorStop(1, bot);
-      ctx.fillStyle = grd; ctx.fillRect(0, 0, 2, 512);
-      skyEl.setAttribute('color', '#ffffff');
-      const applyTex = () => {
-        const mesh = skyEl.getObject3D('mesh');
-        if (!mesh) return;
-        mesh.material.map = new THREE.CanvasTexture(canvas);
-        mesh.material.color.set('#ffffff');
-        mesh.material.needsUpdate = true;
-      };
-      const mesh = skyEl.getObject3D('mesh');
-      if (mesh) applyTex();
-      else skyEl.addEventListener('object3d-set', applyTex, { once: true });
+    function gradientDataURL(top, bot) {
+      const c = document.createElement('canvas');
+      c.width = 2; c.height = 512;
+      const ctx = c.getContext('2d');
+      const g = ctx.createLinearGradient(0, 0, 0, 512);
+      g.addColorStop(0, top); g.addColorStop(1, bot);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 512);
+      return c.toDataURL();
     }
 
-    function applyLighting(lighting) {
-      if (!lighting) { addLight('ambient', { color: '#fff', intensity: 0.6 }); return; }
-      if (lighting.ambient) addLight('ambient', lighting.ambient);
-      if (lighting.hemisphere) {
+    // ── Fog ───────────────────────────────────────────────────────────────
+    function applyFog(fog) {
+      if (fog?.enabled) {
+        scene.setAttribute('fog', `type: exponential; color: ${fog.color}; density: ${fog.density}`);
+      }
+    }
+
+    // ── Lighting ──────────────────────────────────────────────────────────
+    function applyLighting(lt) {
+      // defaultLightsEnabled: false is set on the scene, so we always add ours
+      const lighting = lt || {};
+      const amb = lighting.ambient || { color: '#ffffff', intensity: 0.6 };
+      addLight('ambient', amb);
+
+      const hemi = lighting.hemisphere;
+      if (hemi) {
         const l = document.createElement('a-light');
         l.setAttribute('type',         'hemisphere');
-        l.setAttribute('color',        lighting.hemisphere.skyColor);
-        l.setAttribute('ground-color', lighting.hemisphere.groundColor);
-        l.setAttribute('intensity',    lighting.hemisphere.intensity);
+        l.setAttribute('color',        hemi.skyColor    || '#b1e1ff');
+        l.setAttribute('ground-color', hemi.groundColor || '#444466');
+        l.setAttribute('intensity',    hemi.intensity   ?? 0.8);
         scene.appendChild(l);
       }
-      if (lighting.directional) {
-        const d = lighting.directional;
+
+      const dir = lighting.directional;
+      if (dir) {
         const l = document.createElement('a-light');
         l.setAttribute('type',       'directional');
-        l.setAttribute('color',      d.color);
-        l.setAttribute('intensity',  d.intensity);
-        l.setAttribute('position',   `${d.position.x} ${d.position.y} ${d.position.z}`);
-        if (d.castShadow) l.setAttribute('cast-shadow', true);
+        l.setAttribute('color',      dir.color     || '#fff4e0');
+        l.setAttribute('intensity',  dir.intensity ?? 1.2);
+        l.setAttribute('position',   `${dir.position?.x ?? -10} ${dir.position?.y ?? 20} ${dir.position?.z ?? 10}`);
+        if (dir.castShadow) l.setAttribute('cast-shadow', true);
         scene.appendChild(l);
       }
     }
 
     function addLight(type, props) {
       const l = document.createElement('a-light');
-      l.setAttribute('type', type);
-      if (props.color)     l.setAttribute('color',     props.color);
-      if (props.intensity !== undefined) l.setAttribute('intensity', props.intensity);
+      l.setAttribute('type',      type);
+      l.setAttribute('color',     props.color     || '#ffffff');
+      l.setAttribute('intensity', props.intensity ?? 1);
       scene.appendChild(l);
     }
 

@@ -437,7 +437,8 @@
     embedded
     loading-screen="enabled: false"
     renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; toneMappingExposure: 1.15"
-    vr-mode-ui="enabled: false">
+    vr-mode-ui="enabled: false"
+    light="defaultLightsEnabled: false">
     <a-assets timeout="60000"></a-assets>
     <a-sky id="sky" radius="4000"></a-sky>
     <a-entity id="rig" position="0 0 5" key-turn="verticalEnabled: true">
@@ -628,43 +629,35 @@
   }
 
   // ── Skybox ────────────────────────────────────────────────────────────────
+  function gradientDataURL(top, bot) {
+    const c = document.createElement('canvas');
+    c.width = 2; c.height = 512;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, 512);
+    g.addColorStop(0, top); g.addColorStop(1, bot);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 512);
+    return c.toDataURL();
+  }
+
   function applySkybox() {
     const type  = v('skyType').value;
     const skyEl = v('sky');
-    skyEl.removeAttribute('src');
-    skyEl.setAttribute('visible', 'true');
-    skyEl.setAttribute('color', '#ffffff');
-
     if (type === 'gradient') {
-      applyGradientSky(skyEl, v('skyTopColor').value, v('skyBottomColor').value);
+      skyEl.setAttribute('src',     gradientDataURL(v('skyTopColor').value, v('skyBottomColor').value));
+      skyEl.setAttribute('color',   '#ffffff');
+      skyEl.setAttribute('visible', 'true');
     } else if (type === 'solid') {
-      skyEl.setAttribute('color', v('skySolidColor').value);
+      skyEl.removeAttribute('src');
+      skyEl.setAttribute('color',   v('skySolidColor').value);
+      skyEl.setAttribute('visible', 'true');
     } else if (type === 'image') {
       const url = v('skyImageUrl').value.trim();
       if (url) skyEl.setAttribute('src', url);
+      skyEl.setAttribute('color',   '#ffffff');
+      skyEl.setAttribute('visible', 'true');
     } else {
       skyEl.setAttribute('visible', 'false');
     }
-  }
-
-  function applyGradientSky(skyEl, top, bot) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2; canvas.height = 512;
-    const ctx = canvas.getContext('2d');
-    const grd = ctx.createLinearGradient(0, 0, 0, 512);
-    grd.addColorStop(0, top); grd.addColorStop(1, bot);
-    ctx.fillStyle = grd; ctx.fillRect(0, 0, 2, 512);
-    const applyTex = () => {
-      const mesh = skyEl.getObject3D('mesh');
-      if (!mesh) return;
-      const tex = new THREE.CanvasTexture(canvas);
-      mesh.material.map = tex;
-      mesh.material.color.set('#ffffff');
-      mesh.material.needsUpdate = true;
-    };
-    const mesh = skyEl.getObject3D('mesh');
-    if (mesh) applyTex();
-    else skyEl.addEventListener('object3d-set', applyTex, { once: true });
   }
 
   // ── Fog ───────────────────────────────────────────────────────────────────
