@@ -521,10 +521,14 @@ Press any key to continue _`;
       await typeText("DIR", 45, promptLine);
       await wait(175);
 
-      screen.innerHTML +=
-        `\n Volume in drive C is BEERMAT DOODLES\n` +
-        ` Volume Serial Number is 1968-2026\n` +
-        `\n Directory of C:\\\n\n`;
+      [
+        "",
+        " Volume in drive C is BEERMAT DOODLES",
+        " Volume Serial Number is 1968-2026",
+        "",
+        " Directory of C:\\",
+        "",
+      ].forEach(t => { const d = document.createElement("div"); d.textContent = t; screen.appendChild(d); });
 
       await wait(100);
 
@@ -562,8 +566,8 @@ Press any key to continue _`;
       }
 
       await wait(125);
-      screen.innerHTML +=
-        `\n         ${DIRECTORY.length} Dir(s)     1,234,567,890 bytes free\n`;
+      ["", `         ${DIRECTORY.length} Dir(s)     1,234,567,890 bytes free`, ""]
+        .forEach(t => { const d = document.createElement("div"); d.textContent = t; screen.appendChild(d); });
       await wait(200);
 
       spawnPrompt();
