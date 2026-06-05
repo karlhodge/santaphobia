@@ -127,6 +127,10 @@
     // ─── Directory listing ────────────────────────────────────────────────────
     // Add or edit entries here. name must be padded to consistent width.
     const DIRECTORY = [
+      { name: "ABOUT    ", size: "      <DIR>", date: "04-06-2026", text:
+          "Beermat Doodles is the home for web toys developed by journalism lecturer\n" +
+          "and writer, Dr Karl Hodge. Select or type the name of a toy you want to\n" +
+          "play with." },
       { name: "GALLERY  ", size: "      <DIR>", date: "04-06-2026", url: "/gallery/" },
       { name: "STUDIO   ", size: "      <DIR>", date: "04-06-2026", url: "/studio/" },
       { name: "REPORTER ", size: "      <DIR>", date: "04-06-2026", url: "/reporter/" },
@@ -527,11 +531,29 @@ Press any key to continue _`;
       for (const entry of DIRECTORY) {
         const row  = document.createElement("div");
         row.style.marginLeft = "1ch";
-        const link = document.createElement("a");
-        link.className   = "dir-entry";
-        link.href        = entry.url;
-        link.textContent = `${entry.date}  12:00p   ${entry.size}  ${entry.name}`;
-        row.appendChild(link);
+        const label = `${entry.date}  12:00p   ${entry.size}  ${entry.name}`;
+        if (entry.url) {
+          const link = document.createElement("a");
+          link.className   = "dir-entry";
+          link.href        = entry.url;
+          link.textContent = label;
+          row.appendChild(link);
+        } else {
+          const span = document.createElement("span");
+          span.className   = "dir-entry";
+          span.style.cursor = "pointer";
+          span.textContent = label;
+          span.addEventListener("click", () => {
+            entry.text.split("\n").forEach(line => {
+              const el = document.createElement("div");
+              el.textContent = line;
+              screen.appendChild(el);
+            });
+            screen.appendChild(document.createElement("div"));
+            spawnPrompt();
+          });
+          row.appendChild(span);
+        }
         screen.appendChild(row);
         await wait(60);
       }
@@ -567,7 +589,15 @@ Press any key to continue _`;
         frozen.textContent = "C:\\> " + inp.value;
         screen.replaceChild(frozen, wrap);
         const match = DIRECTORY.find(d => d.name.trim() === cmd);
-        if (match) {
+        if (match && match.text) {
+          match.text.split("\n").forEach(line => {
+            const el = document.createElement("div");
+            el.textContent = line;
+            screen.appendChild(el);
+          });
+          screen.appendChild(document.createElement("div"));
+          spawnPrompt();
+        } else if (match && match.url) {
           window.location.href = match.url;
         } else {
           const err = document.createElement("div");
