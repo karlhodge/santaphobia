@@ -197,7 +197,7 @@
       flex-shrink: 0;
     }
 
-    #worlds-list a {
+    #worlds-list a, #worlds-list button.del {
       font-size: 0.75rem;
       padding: 0.3rem 0.7rem;
       border-radius: 5px;
@@ -205,11 +205,16 @@
       color: #c0b8ff;
       background: #2a2a50;
       transition: background 0.15s;
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
     }
 
-    #worlds-list a:hover { background: #3a3a70; }
+    #worlds-list a:hover, #worlds-list button.del:hover { background: #3a3a70; }
     #worlds-list a.visit { background: #2a4040; color: #60ffb0; }
     #worlds-list a.visit:hover { background: #3a6060; }
+    #worlds-list button.del { background: #2a1a1a; color: #c06060; }
+    #worlds-list button.del:hover { background: #3a2020; color: #ff8080; }
   </style>
 </head>
 <body>
@@ -340,9 +345,29 @@
           <span class="world-actions">
             <a href="/configure/${w.slug}">Configure</a>
             <a class="visit" href="/world/${w.slug}" target="_blank">Visit</a>
+            <button class="del" data-slug="${escHtml(w.slug)}" title="Delete world">✕</button>
           </span>
         </li>
       `).join('');
+
+      worldsList.querySelectorAll('button.del').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const slug = btn.dataset.slug;
+          const name = btn.closest('li').querySelector('.world-name').textContent;
+          if (!confirm(`Delete "${name}"?\n\nThis removes the model and all uploads permanently.`)) return;
+          btn.disabled = true;
+          try {
+            const res = await fetch(`/api/worlds/${slug}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error();
+          } catch {
+            alert('Delete failed — the world may have already been removed from the server.');
+          }
+          // Always remove from local list regardless of server response
+          const updated = loadWorlds().filter(w => w.slug !== slug);
+          localStorage.setItem('worlds', JSON.stringify(updated));
+          renderWorlds();
+        });
+      });
     }
 
     function escHtml(s) {

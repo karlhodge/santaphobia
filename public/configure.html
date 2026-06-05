@@ -200,7 +200,8 @@
 
     /* scene */
     #scene-wrapper { position: fixed; top: 0; left: 320px; right: 0; bottom: 0; }
-    a-scene { width: 100%; height: 100%; }
+    #scene-wrapper a-scene,
+    #scene-wrapper a-scene canvas { width: 100% !important; height: 100% !important; display: block; }
     #controls-hint {
       position: fixed; bottom: 0.8rem; left: calc(320px + 50%);
       transform: translateX(-50%);
@@ -433,6 +434,7 @@
 
 <div id="scene-wrapper">
   <a-scene id="scene"
+    embedded
     loading-screen="enabled: false"
     renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; toneMappingExposure: 1.15"
     vr-mode-ui="enabled: false">

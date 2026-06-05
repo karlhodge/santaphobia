@@ -1,7 +1,7 @@
 import express from 'express';
 import multer, { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync } from 'fs';
 import { join, dirname, extname, relative, sep } from 'path';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
@@ -154,6 +154,17 @@ app.put('/api/worlds/:slug/config', (req, res) => {
   const updated = { ...existing, ...req.body };
   writeConfig(req.params.slug, updated);
   res.json(updated);
+});
+
+// Delete a world and all its uploaded files
+app.delete('/api/worlds/:slug', (req, res) => {
+  const slug = req.params.slug;
+  // Validate slug is a UUID to prevent path traversal
+  if (!/^[0-9a-f-]{36}$/.test(slug)) return res.status(400).json({ error: 'Invalid slug' });
+  const dir = join(UPLOADS_DIR, slug);
+  if (!existsSync(dir)) return res.status(404).json({ error: 'Not found' });
+  rmSync(dir, { recursive: true, force: true });
+  res.json({ ok: true });
 });
 
 // Legacy route — redirect to the actual model file via the files route
