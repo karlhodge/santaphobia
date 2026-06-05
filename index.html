@@ -24,14 +24,13 @@
       word-break: break-word;
     }
 
-    .dim { color: #1a8c1a; }
-    .bright { color: #66ff66; font-weight: bold; }
+    .dim  { color: #1a8c1a; }
+    .bright { color: #99ff99; font-weight: bold; }
 
     .dir-entry {
       display: block;
       color: #33ff33;
       text-decoration: none;
-      padding: 0;
     }
     .dir-entry:hover { color: #99ff99; text-decoration: underline; }
 
@@ -53,20 +52,83 @@
       font-size: 12px;
       font-family: "Courier New", Courier, monospace;
     }
+
+    /* ── BSOD overlay ─────────────────────────────────────────── */
+    #bsod {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #0000aa;
+      color: #fff;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 16px;
+      padding: 40px 60px;
+      z-index: 100;
+      white-space: pre-wrap;
+    }
+
+    /* ── Matrix canvas ────────────────────────────────────────── */
+    #matrix-canvas {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+    }
+
+    /* ── Dancing banana ───────────────────────────────────────── */
+    #banana {
+      display: none;
+      position: fixed;
+      bottom: 50px;
+      left: 50px;
+      font-size: 52px;
+      z-index: 200;
+      animation: dance 0.25s ease-in-out infinite alternate;
+    }
+    @keyframes dance {
+      from { transform: rotate(-25deg) translateY(0); }
+      to   { transform: rotate(25deg) translateY(-12px); }
+    }
+
+    /* ── Explosion ────────────────────────────────────────────── */
+    @keyframes explode {
+      0%   { background: #000; }
+      8%   { background: #fff; }
+      20%  { background: #ff6600; }
+      40%  { background: #ffcc00; }
+      65%  { background: #ff2200; }
+      85%  { background: #330000; }
+      100% { background: #000; }
+    }
+    .exploding { animation: explode 2.5s forwards; }
+
+    /* ── Screen shake ─────────────────────────────────────────── */
+    @keyframes shake {
+      0%,100% { transform: translate(0,0) rotate(0deg); }
+      15%  { transform: translate(-10px, 5px) rotate(-1deg); }
+      30%  { transform: translate(10px, -5px) rotate(1deg); }
+      45%  { transform: translate(-7px, 7px) rotate(-0.5deg); }
+      60%  { transform: translate(7px, -3px) rotate(0.5deg); }
+      75%  { transform: translate(-4px, 4px) rotate(-0.3deg); }
+      90%  { transform: translate(4px, -4px) rotate(0.3deg); }
+    }
+    .shaking { animation: shake 0.45s ease-in-out 3; }
   </style>
 </head>
 <body>
   <div id="screen"></div>
+  <div id="bsod"></div>
+  <canvas id="matrix-canvas"></canvas>
+  <div id="banana">🍌</div>
   <div id="copyright">Copyright &copy; Spodgod. All rights reserved.</div>
 
   <script>
     // ─── Directory listing ────────────────────────────────────────────────────
-    // To add or edit items, modify this array.
-    // Each entry: { name, size, date, url }
+    // Add or edit entries here. name must be padded to consistent width.
     const DIRECTORY = [
-      { name: "GALLERY    ", size: "      <DIR>", date: "04-06-2026", url: "/gallery/" },
-      { name: "STUDIO     ", size: "      <DIR>", date: "04-06-2026", url: "/studio/" },
-      { name: "REPORTER   ", size: "      <DIR>", date: "04-06-2026", url: "/reporter/" },
+      { name: "GALLERY  ", size: "      <DIR>", date: "04-06-2026", url: "/gallery/" },
+      { name: "STUDIO   ", size: "      <DIR>", date: "04-06-2026", url: "/studio/" },
+      { name: "REPORTER ", size: "      <DIR>", date: "04-06-2026", url: "/reporter/" },
     ];
 
     // ─── Boot messages ────────────────────────────────────────────────────────
@@ -91,134 +153,418 @@
       { text: "", delay: 100 },
     ];
 
-    // ─── Renderer ─────────────────────────────────────────────────────────────
+    // ─── Helpers ──────────────────────────────────────────────────────────────
     const screen = document.getElementById("screen");
-    let totalDelay = 0;
+    const wait   = ms => new Promise(r => setTimeout(r, ms));
 
-    function appendLine(html, delayBefore = 0) {
-      totalDelay += delayBefore;
-      return new Promise(resolve => {
-        setTimeout(() => {
-          screen.innerHTML += html + "\n";
-          resolve();
-        }, totalDelay);
-      });
+    function escHtml(s) {
+      return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function appendLine(text, cls = "dim") {
+      const d = document.createElement("div");
+      d.innerHTML = `<span class="${cls}">${escHtml(text)}</span>`;
+      screen.appendChild(d);
+      return d;
+    }
+
+    function clearScreen() { screen.innerHTML = ""; }
+
+    async function runBootLines() {
+      for (const line of BOOT_LINES) {
+        await wait(line.delay);
+        appendLine(line.text);
+      }
     }
 
     function typeText(text, charDelay, container) {
       return new Promise(resolve => {
         let i = 0;
-        const cursor = document.createElement("span");
-        cursor.id = "cursor";
-        container.appendChild(cursor);
-
+        const cur = document.createElement("span");
+        cur.id = "cursor";
+        container.appendChild(cur);
         function next() {
           if (i < text.length) {
-            cursor.before(document.createTextNode(text[i]));
-            i++;
+            cur.before(document.createTextNode(text[i++]));
             setTimeout(next, charDelay + Math.random() * charDelay * 0.4);
-          } else {
-            cursor.remove();
-            resolve();
-          }
+          } else { cur.remove(); resolve(); }
         }
         next();
       });
     }
 
-    async function run() {
-      // Boot sequence
-      for (const line of BOOT_LINES) {
-        await appendLine(`<span class="dim">${escHtml(line.text)}</span>`, line.delay);
+    // ─── Easter eggs ──────────────────────────────────────────────────────────
+
+    async function eggBanana() {
+      const el = document.getElementById("banana");
+      el.style.display = "block";
+      await wait(3500);
+      el.style.display = "none";
+    }
+
+    async function eggFallingLetters() {
+      // Snapshot character positions before touching the DOM
+      const charWidth = 9.62; // Courier New 16px
+      const positions = [];
+      Array.from(screen.children).forEach(row => {
+        const r = row.getBoundingClientRect();
+        Array.from(row.textContent).forEach((ch, i) => {
+          if (ch.trim()) positions.push({ ch, x: r.left + i * charWidth, y: r.top });
+        });
+      });
+
+      screen.style.visibility = "hidden";
+
+      const layer = document.createElement("div");
+      layer.style.cssText = "position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:10;";
+      document.body.appendChild(layer);
+
+      const spans = positions.map(({ ch, x, y }) => {
+        const el = document.createElement("span");
+        el.textContent = ch;
+        el.style.cssText =
+          `position:absolute;left:${x}px;top:${y}px;color:#33ff33;` +
+          `font-family:"Courier New",Courier,monospace;font-size:16px;` +
+          `transition:transform ${(0.6 + Math.random() * 1.4).toFixed(2)}s ease-in ` +
+          `${(Math.random() * 0.5).toFixed(2)}s,` +
+          `opacity ${(0.4 + Math.random() * 0.6).toFixed(2)}s ease-in ` +
+          `${(Math.random() * 0.6).toFixed(2)}s;`;
+        layer.appendChild(el);
+        return el;
+      });
+
+      await wait(50);
+      spans.forEach(el => {
+        const dist = window.innerHeight - parseFloat(el.style.top) + 120;
+        const rot  = (Math.random() - 0.5) * 720;
+        el.style.transform = `translateY(${dist}px) rotate(${rot}deg)`;
+        el.style.opacity   = "0";
+      });
+
+      await wait(2800);
+      document.body.removeChild(layer);
+      screen.style.visibility = "visible";
+    }
+
+    async function eggMatrix() {
+      const canvas = document.getElementById("matrix-canvas");
+      canvas.style.display = "block";
+      canvas.style.opacity = "1";
+      canvas.style.transition = "";
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx  = canvas.getContext("2d");
+      const cols  = Math.floor(canvas.width / 16);
+      const drops = Array(cols).fill(1);
+
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      await new Promise(resolve => {
+        let frame = 0;
+        const MAX = 130;
+        function draw() {
+          ctx.fillStyle = "rgba(0,0,0,0.05)";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "#33ff33";
+          ctx.font = "15px Courier New";
+          drops.forEach((y, i) => {
+            ctx.fillText(Math.random() > 0.5 ? "1" : "0", i * 16, y * 16);
+            if (y * 16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+            drops[i]++;
+          });
+          if (++frame < MAX) setTimeout(draw, 33);
+          else resolve();
+        }
+        draw();
+      });
+
+      canvas.style.transition = "opacity 0.6s";
+      canvas.style.opacity = "0";
+      await wait(620);
+      canvas.style.display = "none";
+    }
+
+    async function eggBSOD() {
+      const bsod = document.getElementById("bsod");
+      bsod.textContent =
+`Windows
+A fatal exception 0E has occurred at 0028:C0011E36 in VxD VMM(01) +
+00010E36. The current application will be terminated.
+
+*  Press any key to terminate the current application.
+*  Press CTRL+ALT+DEL again to restart your computer. You will
+   lose any unsaved information in all applications.
+
+
+Press any key to continue _`;
+      bsod.style.display = "block";
+      await wait(4000);
+      bsod.style.display = "none";
+    }
+
+    async function eggDialup() {
+      clearScreen();
+      appendLine("Initialising SPODNET connection...");
+      await wait(400);
+      appendLine("");
+
+      // Synthesise modem handshake tones
+      try {
+        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const tones = [
+          [2100,0.40],[1300,0.28],[2100,0.18],[800,0.14],
+          [1300,0.10],[2400,0.18],[1200,0.14],[2400,0.10],
+          [1800,0.12],[3000,0.08],[1600,0.16],[2200,0.10],
+        ];
+        let t = ac.currentTime + 0.05;
+        tones.forEach(([freq, dur]) => {
+          const osc  = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.connect(gain); gain.connect(ac.destination);
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.12, t);
+          osc.start(t); osc.stop(t + dur);
+          t += dur;
+        });
+      } catch(_) {}
+
+      const bar = document.createElement("div");
+      screen.appendChild(bar);
+      const W = 30;
+      for (let i = 0; i <= W; i++) {
+        bar.textContent =
+          `Connecting... [${"=".repeat(i)}>${" ".repeat(W - i)}] ${Math.round(i / W * 100)}%`;
+        await wait(65);
+      }
+      await wait(300);
+      appendLine("");
+      appendLine("Connected to SPODNET at 56,600 bps.");
+      await wait(900);
+    }
+
+    async function eggHacker() {
+      clearScreen();
+      const lines = [
+        "Initialising intrusion protocol...",
+        "Scanning target: 192.168.0.1 ...",
+        "PORT 22  OPEN  [SSH]",
+        "PORT 80  OPEN  [HTTP]",
+        "PORT 443 OPEN  [HTTPS]",
+        "Deploying payload .............. OK",
+        "Bypassing firewall ............. OK",
+        "Escalating privileges .......... OK",
+        "root@spodgod:~# whoami",
+        "root",
+        "root@spodgod:~# cat /etc/shadow",
+        "root:$6$rounds=5000$xxxxxx:19000:0:99999:7:::",
+        "spodgod:$6$rounds=5000$yyyyyy:19000:0:99999:7:::",
+        "root@spodgod:~# rm -rf /*",
+        "rm: cannot remove '/': Permission denied (nice try)",
+        "",
+        ">>> ACCESS GRANTED <<<",
+        "",
+      ];
+      for (const line of lines) {
+        appendLine(line);
+        await wait(70 + Math.random() * 90);
+      }
+      await wait(700);
+    }
+
+    async function eggAlien() {
+      clearScreen();
+      const glyphSet = "█▓▒░▄▀■□▪◘◙†‡•◦∞≈≠∂∑";
+      const glitch = document.createElement("div");
+      screen.appendChild(glitch);
+
+      for (let i = 0; i < 35; i++) {
+        let row = "";
+        const len = 40 + Math.floor(Math.random() * 20);
+        for (let j = 0; j < len; j++) row += glyphSet[Math.floor(Math.random() * glyphSet.length)];
+        glitch.textContent = row;
+        await wait(50 + Math.random() * 50);
       }
 
-      // Prompt appears
-      await appendLine("", 150);
-      totalDelay += 200;
+      clearScreen();
+      await wait(400);
 
-      setTimeout(async () => {
-        // Clear boot screen before dropping to prompt
-        screen.innerHTML = "";
+      const msg = [
+        "",
+        "  ** TRANSMISSION RECEIVED **",
+        "",
+        "  WE KNOW YOU ARE THERE, HUMAN.",
+        "  WE HAVE BEEN WATCHING.",
+        "  YOUR BEERMAT DOODLES AMUSE US.",
+        "",
+        "  GREETINGS FROM SECTOR 7.",
+        "",
+      ];
+      for (const line of msg) { appendLine(line, "bright"); await wait(220); }
+      await wait(1600);
+    }
 
-        // Type the prompt and DIR command
-        const promptLine = document.createElement("div");
-        screen.appendChild(promptLine);
-        promptLine.textContent = "C:\\> ";
+    async function eggSelfDestruct() {
+      clearScreen();
+      appendLine("WARNING: SELF-DESTRUCT SEQUENCE INITIATED");
+      appendLine("");
+      await wait(600);
 
-        await typeText("DIR", 45, promptLine);
+      for (let i = 10; i >= 1; i--) {
+        appendLine(`T-MINUS ${i}...`);
+        await wait(480);
+      }
 
-        await new Promise(r => setTimeout(r, 175));
+      document.body.classList.add("shaking");
+      await wait(1400);
+      document.body.classList.remove("shaking");
 
-        // DIR output header
-        const header =
-          `\n Volume in drive C is BEERMAT DOODLES\n` +
-          ` Volume Serial Number is 1968-2026\n` +
-          `\n Directory of C:\\\n\n`;
+      clearScreen();
+      await wait(200);
+      appendLine("");
+      appendLine("  ...JUST KIDDING.");
+      appendLine("");
+      await wait(1400);
+    }
 
-        screen.innerHTML += header;
+    async function eggThermonuclear() {
+      clearScreen();
+      await wait(300);
+      appendLine("");
+      appendLine("  GREETINGS, PROFESSOR FALKEN.");
+      await wait(1100);
+      appendLine("");
+      appendLine("  SHALL WE PLAY A GAME?");
+      await wait(900);
+      appendLine("");
 
-        // Date/time column widths match classic DOS DIR
-        await new Promise(r => setTimeout(r, 100));
+      await new Promise(resolve => {
+        const wrap  = document.createElement("div");
+        const label = document.createElement("span");
+        label.textContent = "  DO YOU WANT TO PLAY GLOBAL THERMONUCLEAR WAR? (Y/N) ";
+        const inp = document.createElement("input");
+        inp.type = "text"; inp.maxLength = 1;
+        inp.autocomplete = "off"; inp.autocorrect = "off";
+        inp.autocapitalize = "off"; inp.spellcheck = false;
+        inp.style.cssText =
+          "background:transparent;border:none;outline:none;color:#33ff33;" +
+          "font:inherit;caret-color:#33ff33;width:2ch;padding:0;margin:0;";
+        wrap.appendChild(label); wrap.appendChild(inp);
+        screen.appendChild(wrap);
+        inp.focus();
 
-        // Render each directory entry with a slight stagger
-        for (let i = 0; i < DIRECTORY.length; i++) {
-          const entry = DIRECTORY[i];
-          const line = document.createElement("div");
-          line.style.marginLeft = "1ch";
-          const link = document.createElement("a");
-          link.className = "dir-entry";
-          link.href = entry.url;
-          link.textContent =
-            `${entry.date}  12:00p   ${entry.size}  ${entry.name}`;
-          line.appendChild(link);
-          screen.appendChild(line);
-          await new Promise(r => setTimeout(r, 60));
-        }
+        inp.addEventListener("keydown", async function h(e) {
+          if (e.key !== "Enter") return;
+          inp.removeEventListener("keydown", h);
+          const ans = inp.value.trim().toUpperCase();
+          const frozen = document.createElement("div");
+          frozen.textContent = `  DO YOU WANT TO PLAY GLOBAL THERMONUCLEAR WAR? (Y/N) ${inp.value}`;
+          screen.replaceChild(frozen, wrap);
 
-        await new Promise(r => setTimeout(r, 125));
+          if (ans === "Y") {
+            await wait(400);
+            appendLine("");
+            appendLine("  A STRANGE GAME.");
+            await wait(600);
+            appendLine("  THE ONLY WINNING MOVE IS NOT TO PLAY.");
+            await wait(900);
+            document.body.classList.add("exploding");
+            clearScreen();
+            await wait(2600);
+            document.body.classList.remove("exploding");
+          } else {
+            await wait(400);
+            appendLine("");
+            appendLine("  WISE DECISION.");
+            await wait(1200);
+          }
+          resolve();
+        });
+      });
 
-        // Footer
-        screen.innerHTML +=
-          `\n         ${DIRECTORY.length} Dir(s)     1,234,567,890 bytes free\n`;
+      clearScreen();
+      await wait(300);
+    }
 
-        await new Promise(r => setTimeout(r, 200));
+    // ─── Egg registry ─────────────────────────────────────────────────────────
+    const EGGS = [
+      eggBanana,
+      eggFallingLetters,
+      eggMatrix,
+      eggBSOD,
+      eggDialup,
+      eggHacker,
+      eggAlien,
+      eggSelfDestruct,
+      eggThermonuclear,
+    ];
 
-        spawnPrompt();
+    // ─── Visit counter ────────────────────────────────────────────────────────
+    function getVisitCount() {
+      const n = (parseInt(localStorage.getItem("sg_visits") || "0", 10)) + 1;
+      localStorage.setItem("sg_visits", n);
+      return n;
+    }
 
-      }, totalDelay);
+    // ─── Directory listing ────────────────────────────────────────────────────
+    async function showDirectory() {
+      clearScreen();
+
+      const promptLine = document.createElement("div");
+      screen.appendChild(promptLine);
+      promptLine.textContent = "C:\\> ";
+      await typeText("DIR", 45, promptLine);
+      await wait(175);
+
+      screen.innerHTML +=
+        `\n Volume in drive C is BEERMAT DOODLES\n` +
+        ` Volume Serial Number is 1968-2026\n` +
+        `\n Directory of C:\\\n\n`;
+
+      await wait(100);
+
+      for (const entry of DIRECTORY) {
+        const row  = document.createElement("div");
+        row.style.marginLeft = "1ch";
+        const link = document.createElement("a");
+        link.className   = "dir-entry";
+        link.href        = entry.url;
+        link.textContent = `${entry.date}  12:00p   ${entry.size}  ${entry.name}`;
+        row.appendChild(link);
+        screen.appendChild(row);
+        await wait(60);
+      }
+
+      await wait(125);
+      screen.innerHTML +=
+        `\n         ${DIRECTORY.length} Dir(s)     1,234,567,890 bytes free\n`;
+      await wait(200);
+
+      spawnPrompt();
     }
 
     function spawnPrompt() {
-      const wrap = document.createElement("div");
+      const wrap  = document.createElement("div");
       wrap.style.display = "flex";
-
       const label = document.createElement("span");
       label.textContent = "C:\\> ";
-
-      const input = document.createElement("input");
-      input.type = "text";
-      input.autocomplete = "off";
-      input.autocorrect = "off";
-      input.autocapitalize = "off";
-      input.spellcheck = false;
-      input.style.cssText =
+      const inp = document.createElement("input");
+      inp.type = "text";
+      inp.autocomplete = "off"; inp.autocorrect = "off";
+      inp.autocapitalize = "off"; inp.spellcheck = false;
+      inp.style.cssText =
         "background:transparent;border:none;outline:none;color:#33ff33;" +
         "font:inherit;caret-color:#33ff33;flex:1;padding:0;margin:0;";
-
-      wrap.appendChild(label);
-      wrap.appendChild(input);
+      wrap.appendChild(label); wrap.appendChild(inp);
       screen.appendChild(wrap);
-      input.focus();
+      inp.focus();
 
-      input.addEventListener("keydown", function(e) {
+      inp.addEventListener("keydown", function(e) {
         if (e.key !== "Enter") return;
-        const cmd = input.value.trim().toUpperCase();
-
-        // Freeze the input line as plain text
-        const committed = document.createElement("div");
-        committed.textContent = "C:\\> " + input.value;
-        screen.replaceChild(committed, wrap);
-
+        const cmd = inp.value.trim().toUpperCase();
+        const frozen = document.createElement("div");
+        frozen.textContent = "C:\\> " + inp.value;
+        screen.replaceChild(frozen, wrap);
         const match = DIRECTORY.find(d => d.name.trim() === cmd);
         if (match) {
           window.location.href = match.url;
@@ -226,14 +572,25 @@
           const err = document.createElement("div");
           err.textContent = "COMMAND NOT FOUND";
           screen.appendChild(err);
-          screen.appendChild(document.createElement("div")); // blank line
+          screen.appendChild(document.createElement("div"));
           spawnPrompt();
         }
       });
     }
 
-    function escHtml(str) {
-      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // ─── Main ─────────────────────────────────────────────────────────────────
+    async function run() {
+      const visits = getVisitCount();
+
+      await runBootLines();
+      await wait(350);
+
+      if (visits > 1) {
+        const egg = EGGS[Math.floor(Math.random() * EGGS.length)];
+        await egg();
+      }
+
+      await showDirectory();
     }
 
     run();
