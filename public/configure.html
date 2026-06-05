@@ -801,8 +801,16 @@
 
   // ── Spawn ─────────────────────────────────────────────────────────────────
   v('setSpawnBtn').addEventListener('click', () => {
-    const pos = rig.object3D.position;
-    config.spawn = { x: +pos.x.toFixed(3), y: +pos.y.toFixed(3), z: +pos.z.toFixed(3) };
+    // wasd-controls moves the camera locally within the rig, so the rig's
+    // X/Z never change — read camera world position for horizontal coords.
+    // R/F move the rig vertically, so rig.y is the correct floor height.
+    const camWorld = new THREE.Vector3();
+    camera.object3D.getWorldPosition(camWorld);
+    config.spawn = {
+      x: +camWorld.x.toFixed(3),
+      y: +rig.object3D.position.y.toFixed(3),
+      z: +camWorld.z.toFixed(3),
+    };
     updateSpawnDisplay(config.spawn);
   });
 
