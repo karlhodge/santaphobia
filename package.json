@@ -1,0 +1,16 @@
+{
+  "name": "world-viewer",
+  "version": "1.0.0",
+  "description": "Upload a 3D model, configure the environment, share a walkable first-person URL",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^2.1.1",
+    "uuid": "^14.0.0"
+  }
+}

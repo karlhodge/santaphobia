@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Configure World</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="/viewer-components.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body { font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; background: #000; }
+
+    /* ── Side panel ── */
+    #panel {
+      position: fixed;
+      top: 0; left: 0;
+      width: 320px;
+      height: 100vh;
+      background: rgba(10, 10, 24, 0.95);
+      backdrop-filter: blur(12px);
+      border-right: 1px solid #1e1e3e;
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #panel-header {
+      padding: 1.2rem 1.2rem 1rem;
+      border-bottom: 1px solid #1e1e3e;
+      flex-shrink: 0;
+    }
+
+    #panel-header h1 {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #4040a0;
+      margin-bottom: 0.4rem;
+    }
+
+    #panel-header .world-name-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid #2a2a50;
+      color: #c0b8ff;
+      font-size: 1.1rem;
+      padding: 0.2rem 0;
+      outline: none;
+    }
+
+    #panel-header .world-name-input:focus {
+      border-bottom-color: #6060ff;
+    }
+
+    #panel-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1rem;
+    }
+
+    #panel-scroll::-webkit-scrollbar { width: 4px; }
+    #panel-scroll::-webkit-scrollbar-track { background: transparent; }
+    #panel-scroll::-webkit-scrollbar-thumb { background: #2a2a50; border-radius: 2px; }
+
+    .section {
+      margin-bottom: 1.5rem;
+    }
+
+    .section-title {
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #4040a0;
+      margin-bottom: 0.75rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      color: #6060a0;
+      margin-bottom: 0.25rem;
+      margin-top: 0.6rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: #6060ff;
+      cursor: pointer;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 32px;
+      border: 1px solid #2a2a50;
+      border-radius: 5px;
+      cursor: pointer;
+      background: none;
+      padding: 2px;
+    }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      background: #16162a;
+      border: 1px solid #2a2a50;
+      border-radius: 5px;
+      color: #c0b8ff;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus {
+      border-color: #6060ff;
+    }
+
+    select {
+      width: 100%;
+      background: #16162a;
+      border: 1px solid #2a2a50;
+      border-radius: 5px;
+      color: #c0b8ff;
+      padding: 0.4rem 0.6rem;
+      font-size: 0.85rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; }
+    .row-3 label, .row-2 label { margin-top: 0; font-size: 0.65rem; }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+    }
+
+    .toggle-row label { margin: 0; }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    .toggle input { opacity: 0; width: 0; height: 0; }
+
+    .toggle-slider {
+      position: absolute;
+      inset: 0;
+      background: #2a2a50;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-slider::before {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 3px;
+      top: 3px;
+      background: #6060a0;
+      border-radius: 50%;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle input:checked + .toggle-slider { background: #4040cc; }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(16px); background: #c0b8ff; }
+
+    #panel-footer {
+      padding: 1rem 1.2rem;
+      border-top: 1px solid #1e1e3e;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 0.6rem 1rem;
+      border-radius: 7px;
+      border: none;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+
+    .btn-primary { background: #4040cc; color: #fff; }
+    .btn-primary:hover { background: #5050e0; }
+    .btn-secondary { background: #1a1a30; color: #8080c0; border: 1px solid #2a2a50; }
+    .btn-secondary:hover { background: #22223a; }
+
+    #save-status {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #4040a0;
+      min-height: 1em;
+    }
+
+    #save-status.ok { color: #60d0a0; }
+    #save-status.err { color: #ff6060; }
+
+    .spawn-btn {
+      width: 100%;
+      margin-top: 0.5rem;
+      background: #1a2a1a;
+      border: 1px solid #2a502a;
+      color: #60d0a0;
+      border-radius: 5px;
+      padding: 0.5rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .spawn-btn:hover { background: #22402a; }
+
+    .spawn-coords {
+      font-size: 0.7rem;
+      color: #3a503a;
+      margin-top: 0.3rem;
+      font-family: monospace;
+    }
+
+    /* The 3D scene fills everything right of the panel */
+    #scene-wrapper {
+      position: fixed;
+      top: 0;
+      left: 320px;
+      right: 0;
+      bottom: 0;
+    }
+
+    a-scene {
+      width: 100%;
+      height: 100%;
+    }
+
+    #controls-hint {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.7rem;
+      color: rgba(100,90,160,0.7);
+      text-align: center;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .subsection-hidden { display: none; }
+
+    .range-with-val {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .range-with-val input[type="range"] { flex: 1; }
+    .range-with-val .val { font-size: 0.7rem; color: #5050a0; width: 30px; text-align: right; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <div id="panel">
+    <div id="panel-header">
+      <h1>Configure World</h1>
+      <input class="world-name-input" id="worldName" type="text" placeholder="World name" maxlength="80">
+    </div>
+
+    <div id="panel-scroll">
+
+      <!-- Spawn -->
+      <div class="section">
+        <div class="section-title">Spawn Point</div>
+        <p style="font-size:0.75rem; color:#4040a0; margin-bottom:0.5rem;">Walk to where you want players to start, then click Set.</p>
+        <button class="spawn-btn" id="setSpawnBtn">⊕ Set spawn to current position</button>
+        <div class="spawn-coords" id="spawnCoords">x: 0, y: 0, z: 5</div>
+      </div>
+
+      <!-- Skybox -->
+      <div class="section">
+        <div class="section-title">Sky</div>
+        <label>Type</label>
+        <select id="skyType">
+          <option value="gradient">Gradient</option>
+          <option value="solid">Solid colour</option>
+          <option value="image">Equirectangular image (URL)</option>
+          <option value="none">None (use fog colour)</option>
+        </select>
+
+        <div id="skyGradientOpts">
+          <label>Top colour</label>
+          <input type="color" id="skyTopColor" value="#1a1a2e">
+          <label>Horizon colour</label>
+          <input type="color" id="skyBottomColor" value="#16213e">
+        </div>
+
+        <div id="skySolidOpts" class="subsection-hidden">
+          <label>Colour</label>
+          <input type="color" id="skySolidColor" value="#0d0d1a">
+        </div>
+
+        <div id="skyImageOpts" class="subsection-hidden">
+          <label>Image URL (equirectangular panorama)</label>
+          <input type="text" id="skyImageUrl" placeholder="https://…/panorama.jpg">
+        </div>
+      </div>
+
+      <!-- Fog -->
+      <div class="section">
+        <div class="section-title">Fog</div>
+        <div class="toggle-row">
+          <label for="fogEnabled">Enable fog</label>
+          <label class="toggle">
+            <input type="checkbox" id="fogEnabled" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="fogOpts">
+          <label>Fog colour</label>
+          <input type="color" id="fogColor" value="#1a1a2e">
+          <label>Density</label>
+          <div class="range-with-val">
+            <input type="range" id="fogDensity" min="0" max="0.1" step="0.001" value="0.015">
+            <span class="val" id="fogDensityVal">0.015</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lighting -->
+      <div class="section">
+        <div class="section-title">Lighting</div>
+
+        <label>Ambient intensity</label>
+        <div class="range-with-val">
+          <input type="range" id="ambientIntensity" min="0" max="3" step="0.05" value="0.6">
+          <span class="val" id="ambientIntensityVal">0.6</span>
+        </div>
+
+        <label>Ambient colour</label>
+        <input type="color" id="ambientColor" value="#ffffff">
+
+        <label style="margin-top:1rem;">Hemisphere sky colour</label>
+        <input type="color" id="hemiSkyColor" value="#b1e1ff">
+        <label>Hemisphere ground colour</label>
+        <input type="color" id="hemiGroundColor" value="#444466">
+        <label>Hemisphere intensity</label>
+        <div class="range-with-val">
+          <input type="range" id="hemiIntensity" min="0" max="3" step="0.05" value="0.8">
+          <span class="val" id="hemiIntensityVal">0.8</span>
+        </div>
+
+        <label style="margin-top:1rem;">Sun colour</label>
+        <input type="color" id="sunColor" value="#fff4e0">
+        <label>Sun intensity</label>
+        <div class="range-with-val">
+          <input type="range" id="sunIntensity" min="0" max="5" step="0.05" value="1.2">
+          <span class="val" id="sunIntensityVal">1.2</span>
+        </div>
+        <label>Sun direction (X Y Z)</label>
+        <div class="row-3">
+          <div><label>X</label><input type="number" id="sunX" value="-10" step="1"></div>
+          <div><label>Y</label><input type="number" id="sunY" value="20" step="1"></div>
+          <div><label>Z</label><input type="number" id="sunZ" value="10" step="1"></div>
+        </div>
+
+        <div class="toggle-row" style="margin-top:0.8rem;">
+          <label for="shadowsEnabled">Cast shadows</label>
+          <label class="toggle">
+            <input type="checkbox" id="shadowsEnabled" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+    </div><!-- /panel-scroll -->
+
+    <div id="panel-footer">
+      <div id="save-status"></div>
+      <button class="btn btn-primary" id="saveBtn">Save changes</button>
+      <a class="btn btn-secondary" id="visitBtn" href="#" target="_blank">Visit world ↗</a>
+    </div>
+  </div><!-- /panel -->
+
+  <div id="scene-wrapper">
+    <a-scene
+      id="scene"
+      loading-screen="enabled: false"
+      renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true; toneMapping: ACESFilmic; toneMappingExposure: 1.15"
+      vr-mode-ui="enabled: false">
+
+      <a-assets id="assets" timeout="60000"></a-assets>
+      <a-sky id="sky" radius="4000"></a-sky>
+
+      <a-entity id="rig" position="0 0 5" key-turn>
+        <a-camera id="camera"
+          position="0 1.7 0"
+          look-controls="pointerLockEnabled: true; magicWindowTrackingEnabled: false"
+          wasd-controls="acceleration: 20; fly: false"
+          wall-collider="distance: 0.5">
+        </a-camera>
+      </a-entity>
+    </a-scene>
+  </div>
+
+  <div id="controls-hint">WASD + mouse to navigate · Q/E to turn · click scene to lock mouse</div>
+
+  <script>
+  (async function () {
+    const slug = location.pathname.split('/')[2];
+    document.getElementById('visitBtn').href = `/world/${slug}`;
+
+    // ── Load config ──────────────────────────────────────────────────────────
+    let config;
+    try {
+      const res = await fetch(`/api/worlds/${slug}/config`);
+      if (!res.ok) throw new Error();
+      config = await res.json();
+    } catch {
+      alert('World not found.');
+      location.href = '/';
+      return;
+    }
+
+    const scene = document.getElementById('scene');
+    const rig = document.getElementById('rig');
+    const camera = document.getElementById('camera');
+
+    // ── Populate form ────────────────────────────────────────────────────────
+    document.getElementById('worldName').value = config.name || '';
+
+    const sky = config.skybox || {};
+    document.getElementById('skyType').value = sky.type || 'gradient';
+    document.getElementById('skyTopColor').value = sky.topColor || '#1a1a2e';
+    document.getElementById('skyBottomColor').value = sky.bottomColor || '#16213e';
+    document.getElementById('skySolidColor').value = sky.color || '#0d0d1a';
+    document.getElementById('skyImageUrl').value = sky.url || '';
+
+    const fog = config.fog || {};
+    document.getElementById('fogEnabled').checked = fog.enabled !== false;
+    document.getElementById('fogColor').value = fog.color || '#1a1a2e';
+    document.getElementById('fogDensity').value = fog.density ?? 0.015;
+    document.getElementById('fogDensityVal').textContent = fog.density ?? 0.015;
+
+    const lt = config.lighting || {};
+    const amb = lt.ambient || {};
+    document.getElementById('ambientIntensity').value = amb.intensity ?? 0.6;
+    document.getElementById('ambientIntensityVal').textContent = amb.intensity ?? 0.6;
+    document.getElementById('ambientColor').value = amb.color || '#ffffff';
+
+    const hemi = lt.hemisphere || {};
+    document.getElementById('hemiSkyColor').value = hemi.skyColor || '#b1e1ff';
+    document.getElementById('hemiGroundColor').value = hemi.groundColor || '#444466';
+    document.getElementById('hemiIntensity').value = hemi.intensity ?? 0.8;
+    document.getElementById('hemiIntensityVal').textContent = hemi.intensity ?? 0.8;
+
+    const sun = lt.directional || {};
+    document.getElementById('sunColor').value = sun.color || '#fff4e0';
+    document.getElementById('sunIntensity').value = sun.intensity ?? 1.2;
+    document.getElementById('sunIntensityVal').textContent = sun.intensity ?? 1.2;
+    const sp2 = sun.position || { x: -10, y: 20, z: 10 };
+    document.getElementById('sunX').value = sp2.x;
+    document.getElementById('sunY').value = sp2.y;
+    document.getElementById('sunZ').value = sp2.z;
+    document.getElementById('shadowsEnabled').checked = sun.castShadow !== false;
+
+    // ── Apply initial scene state ─────────────────────────────────────────────
+    const spawn = config.spawn || { x: 0, y: 0, z: 5 };
+    rig.setAttribute('position', `${spawn.x} ${spawn.y} ${spawn.z}`);
+    updateSpawnDisplay(spawn);
+
+    scene.addEventListener('loaded', () => {
+      applyLighting();
+      applyFog();
+      applySkybox();
+      loadModel();
+    });
+
+    // ── Load model ───────────────────────────────────────────────────────────
+    function loadModel() {
+      const modelEl = document.createElement('a-entity');
+      modelEl.setAttribute('gltf-model', `/api/worlds/${slug}/model.glb`);
+      modelEl.setAttribute('sharp-texture', '');
+      scene.appendChild(modelEl);
+    }
+
+    // ── Sky ──────────────────────────────────────────────────────────────────
+    function applySkybox() {
+      const type = document.getElementById('skyType').value;
+      const skyEl = document.getElementById('sky');
+
+      skyEl.removeAttribute('src');
+      skyEl.setAttribute('color', '#000000');
+
+      if (type === 'gradient') {
+        const top = document.getElementById('skyTopColor').value;
+        const bot = document.getElementById('skyBottomColor').value;
+        applyGradientSky(skyEl, top, bot);
+      } else if (type === 'solid') {
+        skyEl.setAttribute('color', document.getElementById('skySolidColor').value);
+      } else if (type === 'image') {
+        const url = document.getElementById('skyImageUrl').value.trim();
+        if (url) skyEl.setAttribute('src', url);
+      } else if (type === 'none') {
+        skyEl.setAttribute('visible', 'false');
+      }
+    }
+
+    function applyGradientSky(skyEl, top, bot) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      const grd = ctx.createLinearGradient(0, 0, 0, 512);
+      grd.addColorStop(0, top);
+      grd.addColorStop(1, bot);
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, 2, 512);
+
+      skyEl.setAttribute('visible', 'true');
+      skyEl.setAttribute('color', '#ffffff');
+
+      const mesh = skyEl.getObject3D('mesh');
+      if (mesh) {
+        const tex = new THREE.CanvasTexture(canvas);
+        mesh.material.map = tex;
+        mesh.material.needsUpdate = true;
+      } else {
+        skyEl.addEventListener('object3d-set', () => {
+          const m = skyEl.getObject3D('mesh');
+          if (!m) return;
+          const tex = new THREE.CanvasTexture(canvas);
+          m.material.map = tex;
+          m.material.color.set('#ffffff');
+          m.material.needsUpdate = true;
+        }, { once: true });
+      }
+    }
+
+    // ── Fog ──────────────────────────────────────────────────────────────────
+    function applyFog() {
+      const enabled = document.getElementById('fogEnabled').checked;
+      if (enabled) {
+        scene.setAttribute('fog', `type: exponential; color: ${document.getElementById('fogColor').value}; density: ${document.getElementById('fogDensity').value}`);
+      } else {
+        scene.removeAttribute('fog');
+      }
+    }
+
+    // ── Lighting ─────────────────────────────────────────────────────────────
+    let lightEls = [];
+
+    function applyLighting() {
+      lightEls.forEach(l => l.parentNode && l.parentNode.removeChild(l));
+      lightEls = [];
+
+      const ambL = addLight('ambient', {
+        color: document.getElementById('ambientColor').value,
+        intensity: parseFloat(document.getElementById('ambientIntensity').value),
+      });
+
+      const hemiL = addLight('hemisphere', {
+        color: document.getElementById('hemiSkyColor').value,
+        groundColor: document.getElementById('hemiGroundColor').value,
+        intensity: parseFloat(document.getElementById('hemiIntensity').value),
+      });
+
+      const sunL = addLight('directional', {
+        color: document.getElementById('sunColor').value,
+        intensity: parseFloat(document.getElementById('sunIntensity').value),
+        position: {
+          x: parseFloat(document.getElementById('sunX').value),
+          y: parseFloat(document.getElementById('sunY').value),
+          z: parseFloat(document.getElementById('sunZ').value),
+        },
+        castShadow: document.getElementById('shadowsEnabled').checked,
+      });
+
+      lightEls = [ambL, hemiL, sunL];
+    }
+
+    function addLight(type, props) {
+      const l = document.createElement('a-light');
+      l.setAttribute('type', type);
+      if (props.color) l.setAttribute('color', props.color);
+      if (props.intensity !== undefined) l.setAttribute('intensity', props.intensity);
+      if (props.groundColor) l.setAttribute('ground-color', props.groundColor);
+      if (props.position) l.setAttribute('position', `${props.position.x} ${props.position.y} ${props.position.z}`);
+      if (props.castShadow) l.setAttribute('cast-shadow', true);
+      scene.appendChild(l);
+      return l;
+    }
+
+    // ── Spawn ─────────────────────────────────────────────────────────────────
+    document.getElementById('setSpawnBtn').addEventListener('click', () => {
+      const pos = rig.object3D.position;
+      const sp = { x: +pos.x.toFixed(3), y: +pos.y.toFixed(3), z: +pos.z.toFixed(3) };
+      updateSpawnDisplay(sp);
+      config.spawn = sp;
+    });
+
+    function updateSpawnDisplay(sp) {
+      document.getElementById('spawnCoords').textContent = `x: ${sp.x}, y: ${sp.y}, z: ${sp.z}`;
+    }
+
+    // ── Live updates on control change ────────────────────────────────────────
+    function rangeVal(inputId, displayId) {
+      const inp = document.getElementById(inputId);
+      const disp = document.getElementById(displayId);
+      inp.addEventListener('input', () => { disp.textContent = inp.value; });
+    }
+
+    rangeVal('fogDensity', 'fogDensityVal');
+    rangeVal('ambientIntensity', 'ambientIntensityVal');
+    rangeVal('hemiIntensity', 'hemiIntensityVal');
+    rangeVal('sunIntensity', 'sunIntensityVal');
+
+    ['skyType'].forEach(id => document.getElementById(id).addEventListener('change', () => {
+      const type = document.getElementById('skyType').value;
+      document.getElementById('skyGradientOpts').classList.toggle('subsection-hidden', type !== 'gradient');
+      document.getElementById('skySolidOpts').classList.toggle('subsection-hidden', type !== 'solid');
+      document.getElementById('skyImageOpts').classList.toggle('subsection-hidden', type !== 'image');
+      applySkybox();
+    }));
+
+    // Init sky section visibility
+    (() => {
+      const type = document.getElementById('skyType').value;
+      document.getElementById('skyGradientOpts').classList.toggle('subsection-hidden', type !== 'gradient');
+      document.getElementById('skySolidOpts').classList.toggle('subsection-hidden', type !== 'solid');
+      document.getElementById('skyImageOpts').classList.toggle('subsection-hidden', type !== 'image');
+    })();
+
+    ['skyTopColor','skyBottomColor','skySolidColor','skyImageUrl'].forEach(id =>
+      document.getElementById(id).addEventListener('input', applySkybox));
+
+    ['fogEnabled','fogColor','fogDensity'].forEach(id =>
+      document.getElementById(id).addEventListener('input', applyFog));
+
+    const lightInputs = ['ambientIntensity','ambientColor','hemiSkyColor','hemiGroundColor',
+      'hemiIntensity','sunColor','sunIntensity','sunX','sunY','sunZ','shadowsEnabled'];
+    lightInputs.forEach(id => document.getElementById(id).addEventListener('input', applyLighting));
+
+    document.getElementById('fogEnabled').addEventListener('change', () => {
+      document.getElementById('fogOpts').style.display =
+        document.getElementById('fogEnabled').checked ? '' : 'none';
+      applyFog();
+    });
+
+    // ── Save ─────────────────────────────────────────────────────────────────
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      const status = document.getElementById('save-status');
+      status.className = '';
+      status.textContent = 'Saving…';
+
+      const skyType = document.getElementById('skyType').value;
+      const skybox = skyType === 'gradient' ? {
+        type: 'gradient',
+        topColor: document.getElementById('skyTopColor').value,
+        bottomColor: document.getElementById('skyBottomColor').value,
+      } : skyType === 'solid' ? {
+        type: 'solid',
+        color: document.getElementById('skySolidColor').value,
+      } : skyType === 'image' ? {
+        type: 'image',
+        url: document.getElementById('skyImageUrl').value.trim(),
+      } : { type: 'none', color: '#000000' };
+
+      const payload = {
+        name: document.getElementById('worldName').value.trim() || 'Untitled World',
+        spawn: config.spawn || { x: 0, y: 0, z: 5 },
+        skybox,
+        fog: {
+          enabled: document.getElementById('fogEnabled').checked,
+          color: document.getElementById('fogColor').value,
+          density: parseFloat(document.getElementById('fogDensity').value),
+        },
+        lighting: {
+          ambient: {
+            color: document.getElementById('ambientColor').value,
+            intensity: parseFloat(document.getElementById('ambientIntensity').value),
+          },
+          hemisphere: {
+            skyColor: document.getElementById('hemiSkyColor').value,
+            groundColor: document.getElementById('hemiGroundColor').value,
+            intensity: parseFloat(document.getElementById('hemiIntensity').value),
+          },
+          directional: {
+            color: document.getElementById('sunColor').value,
+            intensity: parseFloat(document.getElementById('sunIntensity').value),
+            position: {
+              x: parseFloat(document.getElementById('sunX').value),
+              y: parseFloat(document.getElementById('sunY').value),
+              z: parseFloat(document.getElementById('sunZ').value),
+            },
+            castShadow: document.getElementById('shadowsEnabled').checked,
+          },
+        },
+      };
+
+      try {
+        const res = await fetch(`/api/worlds/${slug}/config`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error();
+        config = { ...config, ...payload };
+        status.className = 'ok';
+        status.textContent = 'Saved ✓';
+      } catch {
+        status.className = 'err';
+        status.textContent = 'Save failed';
+      }
+
+      setTimeout(() => { status.textContent = ''; status.className = ''; }, 3000);
+    });
+
+  })();
+  </script>
+</body>
+</html>

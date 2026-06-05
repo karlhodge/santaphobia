@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Viewer — Upload</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0d0d1a;
+      color: #e0e0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.5rem;
+      color: #c0b8ff;
+    }
+
+    .subtitle {
+      color: #6060a0;
+      margin-bottom: 3rem;
+      font-size: 0.9rem;
+    }
+
+    .upload-box {
+      border: 2px dashed #3030a0;
+      border-radius: 16px;
+      padding: 3rem 4rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      width: 100%;
+      max-width: 540px;
+      position: relative;
+    }
+
+    .upload-box:hover, .upload-box.drag-over {
+      border-color: #6060ff;
+      background: rgba(96,96,255,0.05);
+    }
+
+    .upload-box input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .upload-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+
+    .upload-box p {
+      color: #8080c0;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+    }
+
+    .upload-box strong {
+      color: #c0b8ff;
+      font-size: 1.1rem;
+    }
+
+    .name-row {
+      margin-top: 1.5rem;
+      width: 100%;
+      max-width: 540px;
+    }
+
+    .name-row label {
+      display: block;
+      font-size: 0.8rem;
+      color: #6060a0;
+      margin-bottom: 0.4rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .name-row input {
+      width: 100%;
+      background: #16162a;
+      border: 1px solid #2a2a50;
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      color: #e0e0f0;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .name-row input:focus {
+      border-color: #6060ff;
+    }
+
+    button.upload-btn {
+      margin-top: 1.5rem;
+      background: #4040cc;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.8rem 2.5rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      width: 100%;
+      max-width: 540px;
+    }
+
+    button.upload-btn:hover { background: #5050e0; }
+    button.upload-btn:disabled { background: #2a2a50; color: #4a4a80; cursor: not-allowed; }
+
+    #status {
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      color: #6060a0;
+      text-align: center;
+    }
+
+    #status.error { color: #ff6060; }
+    #status.success { color: #60ffb0; }
+
+    .progress-bar {
+      width: 100%;
+      max-width: 540px;
+      height: 4px;
+      background: #1a1a30;
+      border-radius: 2px;
+      margin-top: 1rem;
+      overflow: hidden;
+      display: none;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #4040cc, #8060ff);
+      width: 0%;
+      transition: width 0.1s;
+    }
+
+    .worlds-section {
+      margin-top: 4rem;
+      width: 100%;
+      max-width: 540px;
+    }
+
+    .worlds-section h2 {
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #4040a0;
+      margin-bottom: 1rem;
+    }
+
+    #worlds-list {
+      list-style: none;
+    }
+
+    #worlds-list li {
+      background: #16162a;
+      border: 1px solid #2a2a50;
+      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    #worlds-list .world-name {
+      font-size: 0.95rem;
+      color: #c0b8ff;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #worlds-list .world-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    #worlds-list a {
+      font-size: 0.75rem;
+      padding: 0.3rem 0.7rem;
+      border-radius: 5px;
+      text-decoration: none;
+      color: #c0b8ff;
+      background: #2a2a50;
+      transition: background 0.15s;
+    }
+
+    #worlds-list a:hover { background: #3a3a70; }
+    #worlds-list a.visit { background: #2a4040; color: #60ffb0; }
+    #worlds-list a.visit:hover { background: #3a6060; }
+  </style>
+</head>
+<body>
+  <h1>World Viewer</h1>
+  <p class="subtitle">Upload a 3D model · configure the environment · share the link</p>
+
+  <div class="upload-box" id="dropZone">
+    <input type="file" id="fileInput" accept=".glb,.gltf">
+    <span class="upload-icon">⬆</span>
+    <strong>Drop a GLB file here</strong>
+    <p>or click to browse</p>
+    <p id="fileName" style="margin-top:1rem; color:#8080ff;"></p>
+  </div>
+
+  <div class="name-row">
+    <label for="worldName">World name</label>
+    <input type="text" id="worldName" placeholder="My World" maxlength="80">
+  </div>
+
+  <button class="upload-btn" id="uploadBtn" disabled>Upload &amp; Configure</button>
+
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+
+  <div id="status"></div>
+
+  <div class="worlds-section">
+    <h2>Your worlds</h2>
+    <ul id="worlds-list"><li style="color:#3030a0; border:none; background:none;">Loading…</li></ul>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const status = document.getElementById('status');
+    const progressBar = document.getElementById('progressBar');
+    const progressFill = document.getElementById('progressFill');
+    const fileNameEl = document.getElementById('fileName');
+    const worldsList = document.getElementById('worlds-list');
+
+    let selectedFile = null;
+
+    function setFile(file) {
+      if (!file) return;
+      selectedFile = file;
+      fileNameEl.textContent = file.name;
+      uploadBtn.disabled = false;
+    }
+
+    fileInput.addEventListener('change', () => setFile(fileInput.files[0]));
+
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      setFile(e.dataTransfer.files[0]);
+    });
+
+    uploadBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      uploadBtn.disabled = true;
+      status.className = '';
+      status.textContent = 'Uploading…';
+      progressBar.style.display = 'block';
+      progressFill.style.width = '0%';
+
+      const formData = new FormData();
+      formData.append('model', selectedFile);
+      const name = document.getElementById('worldName').value.trim() || 'Untitled World';
+      formData.append('name', name);
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+
+      xhr.upload.addEventListener('progress', e => {
+        if (e.lengthComputable) {
+          progressFill.style.width = `${Math.round(e.loaded / e.total * 100)}%`;
+        }
+      });
+
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          const { slug } = JSON.parse(xhr.responseText);
+          status.className = 'success';
+          status.textContent = 'Upload complete — redirecting to configurator…';
+          saveWorld(slug, name);
+          setTimeout(() => window.location.href = `/configure/${slug}`, 800);
+        } else {
+          status.className = 'error';
+          status.textContent = `Upload failed: ${xhr.statusText}`;
+          uploadBtn.disabled = false;
+        }
+      });
+
+      xhr.addEventListener('error', () => {
+        status.className = 'error';
+        status.textContent = 'Network error during upload.';
+        uploadBtn.disabled = false;
+      });
+
+      xhr.send(formData);
+    });
+
+    // Local index of worlds stored in localStorage
+    function saveWorld(slug, name) {
+      const worlds = loadWorlds();
+      worlds.unshift({ slug, name, createdAt: Date.now() });
+      localStorage.setItem('worlds', JSON.stringify(worlds));
+    }
+
+    function loadWorlds() {
+      try { return JSON.parse(localStorage.getItem('worlds') || '[]'); } catch { return []; }
+    }
+
+    function renderWorlds() {
+      const worlds = loadWorlds();
+      if (worlds.length === 0) {
+        worldsList.innerHTML = '<li style="color:#3030a0; border:none; background:none;">No worlds yet — upload one above.</li>';
+        return;
+      }
+      worldsList.innerHTML = worlds.map(w => `
+        <li>
+          <span class="world-name">${escHtml(w.name)}</span>
+          <span class="world-actions">
+            <a href="/configure/${w.slug}">Configure</a>
+            <a class="visit" href="/world/${w.slug}" target="_blank">Visit</a>
+          </span>
+        </li>
+      `).join('');
+    }
+
+    function escHtml(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    renderWorlds();
+  </script>
+</body>
+</html>
