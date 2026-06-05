@@ -217,11 +217,12 @@
   <p class="subtitle">Upload a 3D model · configure the environment · share the link</p>
 
   <div class="upload-box" id="dropZone">
-    <input type="file" id="fileInput" accept=".glb,.gltf">
+    <input type="file" id="fileInput" accept=".glb,.gltf,.zip">
     <span class="upload-icon">⬆</span>
-    <strong>Drop a GLB file here</strong>
+    <strong>Drop a GLB, GLTF, or ZIP here</strong>
     <p>or click to browse</p>
-    <p id="fileName" style="margin-top:1rem; color:#8080ff;"></p>
+    <p style="margin-top:0.6rem; font-size:0.75rem; color:#3a3a70;">ZIP can contain a GLTF + textures folder</p>
+    <p id="fileName" style="margin-top:0.6rem; color:#8080ff;"></p>
   </div>
 
   <div class="name-row">

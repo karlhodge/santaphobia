@@ -587,7 +587,10 @@
   let modelEl = null;
   function loadModel() {
     modelEl = document.createElement('a-entity');
-    modelEl.setAttribute('gltf-model', `/api/worlds/${slug}/model.glb`);
+    const modelPath = config.modelFile
+      ? `/api/worlds/${slug}/files/${config.modelFile}`
+      : `/api/worlds/${slug}/files/model.glb`;
+    modelEl.setAttribute('gltf-model', modelPath);
     modelEl.setAttribute('sharp-texture', '');
     applyModelTransform();
     scene.appendChild(modelEl);

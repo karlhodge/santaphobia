@@ -206,8 +206,13 @@
     const yo  = mdl.yOffset  ?? 0;
     const yr  = mdl.yRotation ?? 0;
 
+    // modelFile may be a plain filename or a subpath (e.g. "scene/scene.gltf")
+    const modelPath = config.modelFile
+      ? `/api/worlds/${slug}/files/${config.modelFile}`
+      : `/api/worlds/${slug}/files/model.glb`;
+
     const modelEl = document.createElement('a-entity');
-    modelEl.setAttribute('gltf-model', `/api/worlds/${slug}/model.glb`);
+    modelEl.setAttribute('gltf-model', modelPath);
     modelEl.setAttribute('scale',    `${s} ${s} ${s}`);
     modelEl.setAttribute('position', `0 ${yo} 0`);
     modelEl.setAttribute('rotation', `0 ${yr} 0`);
