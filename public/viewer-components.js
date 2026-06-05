@@ -1,5 +1,6 @@
 /* Shared A-Frame components for World Viewer navigation */
 
+function registerViewerComponents() {
 // Q/E key rotation pivoting around the camera (not the body axis)
 AFRAME.registerComponent('key-turn', {
   init() {
@@ -89,3 +90,10 @@ AFRAME.registerComponent('sharp-texture', {
     });
   },
 });
+} // end registerViewerComponents
+
+if (typeof AFRAME !== 'undefined') {
+  registerViewerComponents();
+} else {
+  window.addEventListener('load', registerViewerComponents);
+}

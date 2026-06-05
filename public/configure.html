@@ -570,8 +570,9 @@
   v('welcomeBody').value  = wel.body  || '';
   v('welcomeBtn').value   = wel.buttonLabel || 'Enter';
 
-  // hotspots
-  hotspots = (config.hotspots || []).map(h => ({ ...h }));
+  // hotspots — declared here so the assignment below isn't in the TDZ
+  let hotspots = (config.hotspots || []).map(h => ({ ...h }));
+  let hotspotEls = [];
   renderHotspotList();
 
   // ── Apply initial 3D scene ─────────────────────────────────────────────────
@@ -710,8 +711,6 @@
   }
 
   // ── Hotspots ──────────────────────────────────────────────────────────────
-  let hotspots = [];
-  let hotspotEls = [];
 
   function renderHotspotList() {
     const list = v('hotspot-list');
