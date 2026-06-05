@@ -81,13 +81,14 @@
       position: fixed;
       bottom: 50px;
       left: 50px;
-      font-size: 52px;
+      width: 120px;
       z-index: 200;
-      animation: dance 0.25s ease-in-out infinite alternate;
+      image-rendering: pixelated;
+      animation: dance 0.3s ease-in-out infinite alternate;
     }
     @keyframes dance {
-      from { transform: rotate(-25deg) translateY(0); }
-      to   { transform: rotate(25deg) translateY(-12px); }
+      from { transform: translateY(0) rotate(-5deg); }
+      to   { transform: translateY(-14px) rotate(5deg); }
     }
 
     /* ── Explosion ────────────────────────────────────────────── */
@@ -119,7 +120,7 @@
   <div id="screen"></div>
   <div id="bsod"></div>
   <canvas id="matrix-canvas"></canvas>
-  <div id="banana">🍌</div>
+  <img id="banana" src="/images/banana.gif" alt="dancing banana">
   <div id="copyright">Copyright &copy; Spodgod. All rights reserved.</div>
 
   <script>
