@@ -311,8 +311,11 @@ A fatal exception 0E has occurred at 0028:C0011E36 in VxD VMM(01) +
 
 Press any key to continue _`;
       bsod.style.display = "block";
-      await wait(4000);
+      await wait(10000);
       bsod.style.display = "none";
+      const lines = ["Whoops.", "Hang on.", "I just checked again, and everything is working fine.", "Sorry about that."];
+      for (const line of lines) { appendLine(line); await wait(600); }
+      await wait(800);
     }
 
     async function eggDialup() {
