@@ -44,8 +44,13 @@ const DEFAULT_CONFIG = {
   lighting: {
     ambient: { color: '#ffffff', intensity: 0.6 },
     hemisphere: { skyColor: '#b1e1ff', groundColor: '#444466', intensity: 0.8 },
-    directional: { color: '#fff4e0', intensity: 1.2, position: { x: -10, y: 20, z: 10 } },
+    directional: { color: '#fff4e0', intensity: 1.2, position: { x: -10, y: 20, z: 10 }, castShadow: true },
   },
+  navigation: { eyeHeight: 1.7, speed: 20, invertY: false },
+  model: { scale: 1.0, yOffset: 0.0, yRotation: 0 },
+  renderer: { exposure: 1.15, vrEnabled: true },
+  welcome: { enabled: false, title: '', body: '' },
+  hotspots: [],
 };
 
 function readConfig(slug) {
