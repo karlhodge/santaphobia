@@ -137,6 +137,9 @@
       totalDelay += 200;
 
       setTimeout(async () => {
+        // Clear boot screen before dropping to prompt
+        screen.innerHTML = "";
+
         // Type the prompt and DIR command
         const promptLine = document.createElement("div");
         screen.appendChild(promptLine);
