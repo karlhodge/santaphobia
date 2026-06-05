@@ -575,13 +575,19 @@
   // ── Apply initial 3D scene ─────────────────────────────────────────────────
   applyNavigation();
 
-  scene.addEventListener('loaded', () => {
+  function initScene() {
     applyLighting();
     applyFog();
     applySkybox();
     applyExposure();
     loadModel();
-  });
+  }
+
+  if (scene.hasLoaded) {
+    initScene();
+  } else {
+    scene.addEventListener('loaded', initScene, { once: true });
+  }
 
   // ── Model ─────────────────────────────────────────────────────────────────
   let modelEl = null;
