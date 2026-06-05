@@ -183,12 +183,53 @@
 
         await new Promise(r => setTimeout(r, 200));
 
-        // Final prompt with blinking cursor
-        const finalLine = document.createElement("div");
-        finalLine.innerHTML = 'C:\\> <span id="cursor"></span>';
-        screen.appendChild(finalLine);
+        spawnPrompt();
 
       }, totalDelay);
+    }
+
+    function spawnPrompt() {
+      const wrap = document.createElement("div");
+      wrap.style.display = "flex";
+
+      const label = document.createElement("span");
+      label.textContent = "C:\\> ";
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.autocomplete = "off";
+      input.autocorrect = "off";
+      input.autocapitalize = "off";
+      input.spellcheck = false;
+      input.style.cssText =
+        "background:transparent;border:none;outline:none;color:#33ff33;" +
+        "font:inherit;caret-color:#33ff33;flex:1;padding:0;margin:0;";
+
+      wrap.appendChild(label);
+      wrap.appendChild(input);
+      screen.appendChild(wrap);
+      input.focus();
+
+      input.addEventListener("keydown", function(e) {
+        if (e.key !== "Enter") return;
+        const cmd = input.value.trim().toUpperCase();
+
+        // Freeze the input line as plain text
+        const committed = document.createElement("div");
+        committed.textContent = "C:\\> " + input.value;
+        screen.replaceChild(committed, wrap);
+
+        const match = DIRECTORY.find(d => d.name.trim() === cmd);
+        if (match) {
+          window.location.href = match.url;
+        } else {
+          const err = document.createElement("div");
+          err.textContent = "COMMAND NOT FOUND";
+          screen.appendChild(err);
+          screen.appendChild(document.createElement("div")); // blank line
+          spawnPrompt();
+        }
+      });
     }
 
     function escHtml(str) {
