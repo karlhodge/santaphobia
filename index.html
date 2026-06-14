@@ -24,20 +24,15 @@
       word-break: break-word;
     }
 
-    .dim  { color: #1a8c1a; }
+    .dim   { color: #1a8c1a; }
     .bright { color: #99ff99; font-weight: bold; }
 
-    .dir-entry {
-      display: block;
-      color: #33ff33;
-      text-decoration: none;
-    }
+    .dir-entry { display: block; color: #33ff33; text-decoration: none; }
     .dir-entry:hover { color: #99ff99; text-decoration: underline; }
 
     #cursor {
       display: inline-block;
-      width: 9px;
-      height: 1em;
+      width: 9px; height: 1em;
       background: #33ff33;
       vertical-align: text-bottom;
       animation: blink 0.75s step-end infinite;
@@ -46,52 +41,38 @@
 
     #copyright {
       position: fixed;
-      bottom: 14px;
-      left: 24px;
+      bottom: 14px; left: 24px;
       color: #555;
       font-size: 12px;
       font-family: "Courier New", Courier, monospace;
     }
 
-    /* ── BSOD overlay ─────────────────────────────────────────── */
+    /* ── Easter egg overlays ── */
     #bsod {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: #0000aa;
-      color: #fff;
+      display: none; position: fixed; inset: 0;
+      background: #0000aa; color: #fff;
       font-family: "Courier New", Courier, monospace;
-      font-size: 16px;
-      padding: 40px 60px;
-      z-index: 100;
-      white-space: pre-wrap;
+      font-size: 16px; padding: 40px 60px;
+      z-index: 100; white-space: pre-wrap;
     }
 
-    /* ── Matrix canvas ────────────────────────────────────────── */
     #matrix-canvas {
-      display: none;
-      position: fixed;
-      inset: 0;
-      z-index: 50;
+      display: none; position: fixed; inset: 0; z-index: 50;
     }
 
-    /* ── Dancing banana ───────────────────────────────────────── */
     #banana {
-      display: none;
-      position: fixed;
-      bottom: 50px;
-      left: 50px;
-      width: 120px;
-      z-index: 200;
+      display: none; position: fixed;
+      bottom: 50px; left: 50px;
+      width: 120px; z-index: 200;
       image-rendering: pixelated;
       animation: dance 0.3s ease-in-out infinite alternate;
     }
+
+    /* ── Animations ── */
     @keyframes dance {
       from { transform: translateY(0) rotate(-5deg); }
       to   { transform: translateY(-14px) rotate(5deg); }
     }
-
-    /* ── Explosion ────────────────────────────────────────────── */
     @keyframes explode {
       0%   { background: #000; }
       8%   { background: #fff; }
@@ -101,19 +82,17 @@
       85%  { background: #330000; }
       100% { background: #000; }
     }
-    .exploding { animation: explode 2.5s forwards; }
-
-    /* ── Screen shake ─────────────────────────────────────────── */
     @keyframes shake {
       0%,100% { transform: translate(0,0) rotate(0deg); }
-      15%  { transform: translate(-10px, 5px) rotate(-1deg); }
-      30%  { transform: translate(10px, -5px) rotate(1deg); }
-      45%  { transform: translate(-7px, 7px) rotate(-0.5deg); }
-      60%  { transform: translate(7px, -3px) rotate(0.5deg); }
-      75%  { transform: translate(-4px, 4px) rotate(-0.3deg); }
-      90%  { transform: translate(4px, -4px) rotate(0.3deg); }
+      15% { transform: translate(-10px, 5px) rotate(-1deg); }
+      30% { transform: translate(10px, -5px) rotate(1deg); }
+      45% { transform: translate(-7px, 7px) rotate(-0.5deg); }
+      60% { transform: translate(7px, -3px) rotate(0.5deg); }
+      75% { transform: translate(-4px, 4px) rotate(-0.3deg); }
+      90% { transform: translate(4px, -4px) rotate(0.3deg); }
     }
-    .shaking { animation: shake 0.45s ease-in-out 3; }
+    .exploding { animation: explode 2.5s forwards; }
+    .shaking   { animation: shake 0.45s ease-in-out 3; }
   </style>
 </head>
 <body>
@@ -124,25 +103,25 @@
   <div id="copyright">Copyright &copy; Spodgod. All rights reserved.</div>
 
   <script>
-    // ─── Directory listing ────────────────────────────────────────────────────
-    // Add or edit entries here. name must be padded to consistent width.
+    // ─── Directory ────────────────────────────────────────────────────────────
+
     function randDate() {
       const y = 2024 + Math.floor(Math.random() * 3);
-      const m = 1  + Math.floor(Math.random() * 12);
-      const d = 1  + Math.floor(Math.random() * 28);
+      const m = 1 + Math.floor(Math.random() * 12);
+      const d = 1 + Math.floor(Math.random() * 28);
       return `${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}-${y}`;
     }
 
     function randTime() {
-      const h   = 1 + Math.floor(Math.random() * 12);
-      const min = Math.floor(Math.random() * 60);
+      const h    = 1 + Math.floor(Math.random() * 12);
+      const min  = Math.floor(Math.random() * 60);
       const ampm = Math.random() > 0.5 ? "a" : "p";
       return `${String(h).padStart(2," ")}:${String(min).padStart(2,"0")}${ampm}`;
     }
 
     function randSize() {
-      const kb = Math.floor(Math.random() * 980000) + 1024;
-      return String(kb.toLocaleString("en-US")).padStart(11," ");
+      return String((Math.floor(Math.random() * 980000) + 1024)
+        .toLocaleString("en-US")).padStart(11," ");
     }
 
     const DIRECTORY = [
@@ -150,59 +129,71 @@
           "Beermat Doodles is the home of web toys developed by journalist and\n" +
           "lecturer Dr Karl Hodge. Select or type the name of a toy you want to\n" +
           "play with." },
-      { name: "GALLERY  ", date: randDate(), url: "/gallery/" },
-      { name: "STUDIO   ", date: randDate(), url: "/studio/" },
+      { name: "GALLERY  ", date: randDate(), url: "/gallery/"  },
+      { name: "STUDIO   ", date: randDate(), url: "/studio/"   },
       { name: "REPORTER ", date: randDate(), url: "/reporter/" },
     ];
 
-    // ─── Boot messages ────────────────────────────────────────────────────────
+    // ─── Boot sequence ────────────────────────────────────────────────────────
+
     const BOOT_LINES = [
-      { text: "BEERMAT BIOS v2.41", delay: 0 },
-      { text: "Copyright (C) 1992-2026 Spodgod", delay: 40 },
-      { text: "", delay: 60 },
-      { text: "CPU: SPODGOD 486DX2-66 ... OK", delay: 100 },
-      { text: "Memory Test: 640K Base ... OK", delay: 90 },
-      { text: "Memory Test: 8192K Extended ... OK", delay: 110 },
-      { text: "", delay: 50 },
-      { text: "Detecting primary master ... S8008CALC", delay: 125 },
-      { text: "Detecting primary slave  ... D03061968", delay: 90 },
-      { text: "", delay: 50 },
-      { text: "Loading SPOD-DOS ...", delay: 150 },
-      { text: "", delay: 40 },
-      { text: "Santaphobia(R) SPOD-DOS(R) Version 6.22", delay: 80 },
-      { text: "(C)Copyright Spodgod 1992-2026", delay: 40 },
-      { text: "", delay: 60 },
+      { text: "BEERMAT BIOS v2.41",                              delay: 0   },
+      { text: "Copyright (C) 1992-2026 Spodgod",                delay: 40  },
+      { text: "",                                                delay: 60  },
+      { text: "CPU: SPODGOD 486DX2-66 ... OK",                  delay: 100 },
+      { text: "Memory Test: 640K Base ... OK",                   delay: 90  },
+      { text: "Memory Test: 8192K Extended ... OK",              delay: 110 },
+      { text: "",                                                delay: 50  },
+      { text: "Detecting primary master ... S8008CALC",          delay: 125 },
+      { text: "Detecting primary slave  ... D03061968",          delay: 90  },
+      { text: "",                                                delay: 50  },
+      { text: "Loading SPOD-DOS ...",                            delay: 150 },
+      { text: "",                                                delay: 40  },
+      { text: "Santaphobia(R) SPOD-DOS(R) Version 6.22",        delay: 80  },
+      { text: "(C)Copyright Spodgod 1992-2026",                 delay: 40  },
+      { text: "",                                                delay: 60  },
       { text: "HIMEM is testing extended dancing bananas...done.", delay: 140 },
-      { text: "RETROCRINGE installed.", delay: 80 },
-      { text: "", delay: 100 },
+      { text: "RETROCRINGE installed.",                          delay: 80  },
+      { text: "",                                                delay: 100 },
     ];
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+
     const screen = document.getElementById("screen");
     const wait   = ms => new Promise(r => setTimeout(r, ms));
     let audioCtx = null;
 
-    function unlockAudio() {
+    function getAC() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === "suspended") audioCtx.resume();
+      return audioCtx;
     }
 
-    function waitForKeypress() {
-      return new Promise(resolve => {
-        const hint = document.createElement("div");
-        hint.textContent = "PRESS ANY KEY TO CONTINUE";
-        hint.style.animation = "blink 0.75s step-end infinite";
-        screen.appendChild(hint);
+    function unlockAudio() {
+      const ac = getAC();
+      if (ac.state === "suspended") ac.resume();
+    }
 
-        function handler(e) {
-          document.removeEventListener("keydown", handler);
-          document.removeEventListener("click",   handler);
-          unlockAudio();
-          hint.remove();
-          resolve();
-        }
-        document.addEventListener("keydown", handler);
-        document.addEventListener("click",   handler);
+    function beep(freq, dur, type = "square", vol = 0.08, delay = 0) {
+      try {
+        const ac   = getAC();
+        const osc  = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain); gain.connect(ac.destination);
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(vol, ac.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + delay + dur);
+        osc.start(ac.currentTime + delay);
+        osc.stop(ac.currentTime + delay + dur);
+      } catch(_) {}
+    }
+
+    function synth(text, rate = 0.85, pitch = 0.6) {
+      return new Promise(resolve => {
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.rate = rate; utt.pitch = pitch; utt.volume = 1;
+        utt.onend = utt.onerror = resolve;
+        speechSynthesis.speak(utt);
       });
     }
 
@@ -213,6 +204,17 @@
     function appendLine(text, cls = "dim") {
       const d = document.createElement("div");
       d.innerHTML = `<span class="${cls}">${escHtml(text)}</span>`;
+      screen.appendChild(d);
+      return d;
+    }
+
+    function appendLines(arr, cls) {
+      arr.forEach(t => appendLine(t, cls));
+    }
+
+    function appendDiv(text = "") {
+      const d = document.createElement("div");
+      d.textContent = text;
       screen.appendChild(d);
       return d;
     }
@@ -242,6 +244,28 @@
       });
     }
 
+    function waitForKeypress() {
+      return new Promise(resolve => {
+        const hint = appendDiv("PRESS ANY KEY TO CONTINUE");
+        hint.style.animation = "blink 0.75s step-end infinite";
+        function handler() {
+          document.removeEventListener("keydown", handler);
+          document.removeEventListener("click",   handler);
+          unlockAudio();
+          hint.remove();
+          resolve();
+        }
+        document.addEventListener("keydown", handler);
+        document.addEventListener("click",   handler);
+      });
+    }
+
+    function showEntryText(entry) {
+      entry.text.split("\n").forEach(line => appendDiv(line));
+      appendDiv();
+      spawnPrompt();
+    }
+
     // ─── Easter eggs ──────────────────────────────────────────────────────────
 
     async function eggBanana() {
@@ -252,8 +276,7 @@
     }
 
     async function eggFallingLetters() {
-      // Snapshot character positions before touching the DOM
-      const charWidth = 9.62; // Courier New 16px
+      const charWidth = 9.62;
       const positions = [];
       Array.from(screen.children).forEach(row => {
         const r = row.getBoundingClientRect();
@@ -263,7 +286,6 @@
       });
 
       screen.style.visibility = "hidden";
-
       const layer = document.createElement("div");
       layer.style.cssText = "position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:10;";
       document.body.appendChild(layer);
@@ -284,10 +306,8 @@
 
       await wait(50);
       spans.forEach(el => {
-        const dist = window.innerHeight - parseFloat(el.style.top) + 120;
-        const rot  = (Math.random() - 0.5) * 720;
-        el.style.transform = `translateY(${dist}px) rotate(${rot}deg)`;
-        el.style.opacity   = "0";
+        el.style.transform = `translateY(${window.innerHeight - parseFloat(el.style.top) + 120}px) rotate(${(Math.random() - 0.5) * 720}deg)`;
+        el.style.opacity = "0";
       });
 
       await wait(2800);
@@ -297,12 +317,10 @@
 
     async function eggMatrix() {
       const canvas = document.getElementById("matrix-canvas");
-      canvas.style.display = "block";
-      canvas.style.opacity = "1";
-      canvas.style.transition = "";
+      canvas.style.cssText = "display:block;opacity:1;transition:none;";
       canvas.width  = window.innerWidth;
       canvas.height = window.innerHeight;
-      const ctx  = canvas.getContext("2d");
+      const ctx   = canvas.getContext("2d");
       const cols  = Math.floor(canvas.width / 16);
       const drops = Array(cols).fill(1);
 
@@ -311,7 +329,6 @@
 
       await new Promise(resolve => {
         let frame = 0;
-        const MAX = 130;
         function draw() {
           ctx.fillStyle = "rgba(0,0,0,0.05)";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -322,8 +339,7 @@
             if (y * 16 > canvas.height && Math.random() > 0.975) drops[i] = 0;
             drops[i]++;
           });
-          if (++frame < MAX) setTimeout(draw, 33);
-          else resolve();
+          if (++frame < 130) setTimeout(draw, 33); else resolve();
         }
         draw();
       });
@@ -335,21 +351,8 @@
     }
 
     async function eggBSOD() {
-      // Windows-style error bong: two sine tones in quick succession
-      try {
-        const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        [[392, 0, 0.3], [261, 0.28, 0.5]].forEach(([freq, delay, dur]) => {
-          const osc  = ac.createOscillator();
-          const gain = ac.createGain();
-          osc.connect(gain); gain.connect(ac.destination);
-          osc.type = "sine";
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.5, ac.currentTime + delay);
-          gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + delay + dur);
-          osc.start(ac.currentTime + delay);
-          osc.stop(ac.currentTime + delay + dur);
-        });
-      } catch(_) {}
+      [[392, 0, 0.3], [261, 0.28, 0.5]].forEach(([freq, delay, dur]) =>
+        beep(freq, dur, "sine", 0.5, delay));
 
       const bsod = document.getElementById("bsod");
       bsod.textContent =
@@ -365,8 +368,7 @@ A fatal exception 0E has occurred at 0028:C0011E36 in VxD VMM(01) +
 Press any key to continue _`;
       bsod.style.display = "block";
       await wait(5000);
-      const recovery = ["Whoops.", "Hang on.", "I just checked again, and everything is working fine.", "Sorry about that."];
-      for (const line of recovery) {
+      for (const line of ["Whoops.", "Hang on.", "I just checked again, and everything is working fine.", "Sorry about that."]) {
         bsod.textContent += "\n" + line;
         await wait(700);
       }
@@ -378,18 +380,16 @@ Press any key to continue _`;
       clearScreen();
       appendLine("Initialising SPODNET connection...");
       await wait(400);
-      appendLine("");
+      appendDiv();
 
-      // Synthesise modem handshake tones
       try {
-        const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        const tones = [
+        const ac = getAC();
+        let t = ac.currentTime + 0.05;
+        for (const [freq, dur] of [
           [2100,0.40],[1300,0.28],[2100,0.18],[800,0.14],
           [1300,0.10],[2400,0.18],[1200,0.14],[2400,0.10],
           [1800,0.12],[3000,0.08],[1600,0.16],[2200,0.10],
-        ];
-        let t = ac.currentTime + 0.05;
-        tones.forEach(([freq, dur]) => {
+        ]) {
           const osc  = ac.createOscillator();
           const gain = ac.createGain();
           osc.connect(gain); gain.connect(ac.destination);
@@ -397,40 +397,24 @@ Press any key to continue _`;
           gain.gain.setValueAtTime(0.12, t);
           osc.start(t); osc.stop(t + dur);
           t += dur;
-        });
+        }
       } catch(_) {}
 
-      const bar = document.createElement("div");
-      screen.appendChild(bar);
+      const bar = appendDiv();
       const W = 30;
       for (let i = 0; i <= W; i++) {
-        bar.textContent =
-          `Connecting... [${"=".repeat(i)}>${" ".repeat(W - i)}] ${Math.round(i / W * 100)}%`;
+        bar.textContent = `Connecting... [${"=".repeat(i)}>${" ".repeat(W - i)}] ${Math.round(i / W * 100)}%`;
         await wait(65);
       }
       await wait(300);
-      appendLine("");
+      appendDiv();
       appendLine("Connected to SPODNET at 56,600 bps.");
       await wait(900);
     }
 
-    function hackerBeep() {
-      try {
-        const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        const osc  = ac.createOscillator();
-        const gain = ac.createGain();
-        osc.connect(gain); gain.connect(ac.destination);
-        osc.type = "square";
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.08, ac.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.06);
-        osc.start(); osc.stop(ac.currentTime + 0.06);
-      } catch(_) {}
-    }
-
     async function eggHacker() {
       clearScreen();
-      const lines = [
+      for (const line of [
         "Initialising intrusion protocol...",
         "Scanning target: 192.168.0.1 ...",
         "PORT 22  OPEN  [SSH]",
@@ -449,62 +433,43 @@ Press any key to continue _`;
         "",
         ">>> ACCESS GRANTED <<<",
         "",
-      ];
-      for (const line of lines) {
-        hackerBeep();
+      ]) {
+        beep(880, 0.06);
         appendLine(line);
         await wait(120 + Math.random() * 80);
       }
       await wait(700);
     }
 
-    function alienBleep(freq, dur, delay = 0) {
-      try {
-        const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        const osc  = ac.createOscillator();
-        const gain = ac.createGain();
-        osc.connect(gain); gain.connect(ac.destination);
-        osc.type = "square";
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.08, ac.currentTime + delay);
-        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + delay + dur);
-        osc.start(ac.currentTime + delay);
-        osc.stop(ac.currentTime + delay + dur);
-      } catch(_) {}
-    }
-
     async function eggAlien() {
       clearScreen();
-      const glyphSet = "█▓▒░▄▀■□▪◘◙†‡•◦∞≈≠∂∑";
-      const glitch = document.createElement("div");
-      screen.appendChild(glitch);
+      const glyphs = "█▓▒░▄▀■□▪◘◙†‡•◦∞≈≠∂∑";
+      const glitch = appendDiv();
 
       for (let i = 0; i < 35; i++) {
         let row = "";
         const len = 40 + Math.floor(Math.random() * 20);
-        for (let j = 0; j < len; j++) row += glyphSet[Math.floor(Math.random() * glyphSet.length)];
+        for (let j = 0; j < len; j++) row += glyphs[Math.floor(Math.random() * glyphs.length)];
         glitch.textContent = row;
-        // Random static bleeps during glitch phase
-        if (Math.random() > 0.5) alienBleep(200 + Math.random() * 2000, 0.05 + Math.random() * 0.1);
+        if (Math.random() > 0.5) beep(200 + Math.random() * 2000, 0.05 + Math.random() * 0.1);
         await wait(50 + Math.random() * 50);
       }
 
       clearScreen();
       await wait(400);
 
-      const msg = [
-        { text: "",                                    bleep: null },
-        { text: "  ** TRANSMISSION RECEIVED **",       bleep: [880, 0.18] },
-        { text: "",                                    bleep: null },
-        { text: "  WE KNOW YOU ARE THERE, HUMAN.",     bleep: [440, 0.12] },
-        { text: "  WE HAVE BEEN WATCHING.",             bleep: [520, 0.10] },
-        { text: "  YOUR BEERMAT DOODLES AMUSE US.",    bleep: [660, 0.10] },
-        { text: "",                                    bleep: null },
-        { text: "  GREETINGS FROM SECTOR 7.",          bleep: [1100, 0.22] },
-        { text: "",                                    bleep: null },
-      ];
-      for (const { text, bleep } of msg) {
-        if (bleep) alienBleep(bleep[0], bleep[1]);
+      for (const { text, freq } of [
+        { text: "",                                 freq: null },
+        { text: "  ** TRANSMISSION RECEIVED **",    freq: 880  },
+        { text: "",                                 freq: null },
+        { text: "  WE KNOW YOU ARE THERE, HUMAN.",  freq: 440  },
+        { text: "  WE HAVE BEEN WATCHING.",          freq: 520  },
+        { text: "  YOUR BEERMAT DOODLES AMUSE US.", freq: 660  },
+        { text: "",                                 freq: null },
+        { text: "  GREETINGS FROM SECTOR 7.",       freq: 1100 },
+        { text: "",                                 freq: null },
+      ]) {
+        if (freq) beep(freq, 0.18);
         appendLine(text, "bright");
         await wait(240);
       }
@@ -514,62 +479,34 @@ Press any key to continue _`;
     async function eggSelfDestruct() {
       clearScreen();
       appendLine("WARNING: SELF-DESTRUCT SEQUENCE INITIATED");
-      appendLine("");
+      appendDiv();
       await wait(600);
-
-      function speak(text) {
-        return new Promise(resolve => {
-          const utt = new SpeechSynthesisUtterance(text);
-          utt.rate = 0.85;
-          utt.pitch = 0.6;
-          utt.volume = 1;
-          utt.onend = resolve;
-          utt.onerror = resolve;
-          speechSynthesis.speak(utt);
-        });
-      }
 
       for (let i = 10; i >= 1; i--) {
         appendLine(`T-MINUS ${i}...`);
-        await speak(String(i));
+        await synth(String(i));
       }
 
-      await speak("Detonating.");
+      await synth("Detonating.");
       document.body.classList.add("shaking");
       await wait(1400);
       document.body.classList.remove("shaking");
 
       clearScreen();
       await wait(200);
-      appendLine("");
-      appendLine("  ...JUST KIDDING.");
-      appendLine("");
+      appendLines(["", "  ...JUST KIDDING.", ""]);
       await wait(1400);
-    }
-
-    function woprSpeak(text) {
-      return new Promise(resolve => {
-        const utt = new SpeechSynthesisUtterance(text);
-        utt.rate  = 0.8;
-        utt.pitch = 0.4;
-        utt.volume = 1;
-        utt.onend  = resolve;
-        utt.onerror = resolve;
-        speechSynthesis.speak(utt);
-      });
     }
 
     async function eggThermonuclear() {
       clearScreen();
       await wait(300);
-      appendLine("");
-      appendLine("  GREETINGS, PROFESSOR FALKEN.");
-      await woprSpeak("Greetings, Professor Falken.");
-      appendLine("");
-      appendLine("  SHALL WE PLAY A GAME?");
-      await woprSpeak("Shall we play a game?");
+      appendLines(["", "  GREETINGS, PROFESSOR FALKEN."]);
+      await synth("Greetings, Professor Falken.", 0.8, 0.4);
+      appendLines(["", "  SHALL WE PLAY A GAME?"]);
+      await synth("Shall we play a game?", 0.8, 0.4);
       await wait(400);
-      appendLine("");
+      appendDiv();
 
       await new Promise(resolve => {
         const wrap  = document.createElement("div");
@@ -584,26 +521,25 @@ Press any key to continue _`;
           "font:inherit;caret-color:#33ff33;width:2ch;padding:0;margin:0;";
         wrap.appendChild(label); wrap.appendChild(inp);
         screen.appendChild(wrap);
-        woprSpeak("Do you want to play Global Thermonuclear War?");
+        synth("Do you want to play Global Thermonuclear War?", 0.8, 0.4);
         inp.focus();
 
         inp.addEventListener("keydown", async function h(e) {
           if (e.key !== "Enter") return;
           inp.removeEventListener("keydown", h);
           speechSynthesis.cancel();
-          const ans = inp.value.trim().toUpperCase();
+          const ans    = inp.value.trim().toUpperCase();
           const frozen = document.createElement("div");
           frozen.textContent = `  DO YOU WANT TO PLAY GLOBAL THERMONUCLEAR WAR? (Y/N) ${inp.value}`;
           screen.replaceChild(frozen, wrap);
 
           if (ans === "Y") {
             await wait(400);
-            appendLine("");
-            appendLine("  A STRANGE GAME.");
-            woprSpeak("A strange game.");
+            appendLines(["", "  A STRANGE GAME."]);
+            synth("A strange game.", 0.8, 0.4);
             await wait(800);
             appendLine("  THE ONLY WINNING MOVE IS NOT TO PLAY.");
-            await woprSpeak("The only winning move is not to play.");
+            await synth("The only winning move is not to play.", 0.8, 0.4);
             await wait(400);
             document.body.classList.add("exploding");
             clearScreen();
@@ -611,9 +547,8 @@ Press any key to continue _`;
             document.body.classList.remove("exploding");
           } else {
             await wait(400);
-            appendLine("");
-            appendLine("  WISE DECISION.");
-            await woprSpeak("Wise decision.");
+            appendLines(["", "  WISE DECISION."]);
+            await synth("Wise decision.", 0.8, 0.4);
             await wait(600);
           }
           resolve();
@@ -624,73 +559,52 @@ Press any key to continue _`;
       await wait(300);
     }
 
-    // ─── Egg registry ─────────────────────────────────────────────────────────
+    // ─── Egg registry ────────────────────────────────────────────────────────
+
     const EGGS = [
-      eggBanana,
-      eggFallingLetters,
-      eggMatrix,
-      eggBSOD,
-      eggDialup,
-      eggHacker,
-      eggAlien,
-      eggSelfDestruct,
-      eggThermonuclear,
+      eggBanana, eggFallingLetters, eggMatrix, eggBSOD,
+      eggDialup, eggHacker, eggAlien, eggSelfDestruct, eggThermonuclear,
     ];
 
     // ─── Visit counter ────────────────────────────────────────────────────────
+
     function getVisitCount() {
       const n = (parseInt(localStorage.getItem("sg_visits") || "0", 10)) + 1;
       localStorage.setItem("sg_visits", n);
       return n;
     }
 
-    // ─── Directory listing ────────────────────────────────────────────────────
+    // ─── Directory view ───────────────────────────────────────────────────────
+
     async function showDirectory() {
       clearScreen();
 
-      const promptLine = document.createElement("div");
-      screen.appendChild(promptLine);
-      promptLine.textContent = "C:\\> ";
+      const promptLine = appendDiv("C:\\> ");
       await typeText("DIR", 45, promptLine);
       await wait(175);
 
-      [
-        "",
-        " Volume in drive C is BEERMAT DOODLES",
-        " Volume Serial Number is 1968-2026",
-        "",
-        " Directory of C:\\",
-        "",
-      ].forEach(t => { const d = document.createElement("div"); d.textContent = t; screen.appendChild(d); });
+      [" ", " Volume in drive C is BEERMAT DOODLES",
+       " Volume Serial Number is 1968-2026", " ", " Directory of C:\\", " "]
+        .forEach(t => appendDiv(t));
 
       await wait(100);
 
       for (const entry of DIRECTORY) {
-        const row  = document.createElement("div");
+        const row   = document.createElement("div");
         row.style.marginLeft = "1ch";
         const label = `${entry.date}  ${randTime()}  ${randSize()}  ${entry.name}`;
+
         if (entry.url) {
           const link = document.createElement("a");
-          link.className   = "dir-entry";
-          link.href        = entry.url;
-          link.textContent = label;
+          link.className = "dir-entry"; link.href = entry.url; link.textContent = label;
           row.appendChild(link);
         } else {
           const span = document.createElement("span");
-          span.className   = "dir-entry";
-          span.style.cursor = "pointer";
-          span.textContent = label;
+          span.className = "dir-entry"; span.style.cursor = "pointer"; span.textContent = label;
           span.addEventListener("click", () => {
-            // Remove the active prompt if one exists
-            const activeInput = screen.querySelector("input");
-            if (activeInput) activeInput.closest("div").remove();
-            entry.text.split("\n").forEach(line => {
-              const el = document.createElement("div");
-              el.textContent = line;
-              screen.appendChild(el);
-            });
-            screen.appendChild(document.createElement("div"));
-            spawnPrompt();
+            const active = screen.querySelector("input");
+            if (active) active.closest("div").remove();
+            showEntryText(entry);
           });
           row.appendChild(span);
         }
@@ -700,11 +614,13 @@ Press any key to continue _`;
 
       await wait(125);
       ["", `         ${DIRECTORY.length} Dir(s)     1,234,567,890 bytes free`, ""]
-        .forEach(t => { const d = document.createElement("div"); d.textContent = t; screen.appendChild(d); });
+        .forEach(t => appendDiv(t));
       await wait(200);
 
       spawnPrompt();
     }
+
+    // ─── Prompt ───────────────────────────────────────────────────────────────
 
     function spawnPrompt() {
       const wrap  = document.createElement("div");
@@ -724,45 +640,33 @@ Press any key to continue _`;
 
       inp.addEventListener("keydown", function(e) {
         if (e.key !== "Enter") return;
-        const cmd = inp.value.trim().toUpperCase();
+        const cmd    = inp.value.trim().toUpperCase();
         const frozen = document.createElement("div");
         frozen.textContent = "C:\\> " + inp.value;
         screen.replaceChild(frozen, wrap);
+
         const match = DIRECTORY.find(d => d.name.trim() === cmd);
         if (match && match.text) {
-          match.text.split("\n").forEach(line => {
-            const el = document.createElement("div");
-            el.textContent = line;
-            screen.appendChild(el);
-          });
-          screen.appendChild(document.createElement("div"));
-          spawnPrompt();
+          showEntryText(match);
         } else if (match && match.url) {
           window.location.href = match.url;
         } else {
-          const err = document.createElement("div");
-          err.textContent = "COMMAND NOT FOUND";
-          screen.appendChild(err);
-          screen.appendChild(document.createElement("div"));
+          appendDiv("COMMAND NOT FOUND");
+          appendDiv();
           spawnPrompt();
         }
       });
     }
 
     // ─── Main ─────────────────────────────────────────────────────────────────
+
     async function run() {
       const visits = getVisitCount();
-
       await runBootLines();
       await wait(350);
       await waitForKeypress();
       await wait(200);
-
-      if (visits > 1) {
-        const egg = EGGS[Math.floor(Math.random() * EGGS.length)];
-        await egg();
-      }
-
+      if (visits > 1) await EGGS[Math.floor(Math.random() * EGGS.length)]();
       await showDirectory();
     }
 
