@@ -415,6 +415,21 @@ Press any key to continue _`;
       await wait(700);
     }
 
+    function alienBleep(freq, dur, delay = 0) {
+      try {
+        const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const osc  = ac.createOscillator();
+        const gain = ac.createGain();
+        osc.connect(gain); gain.connect(ac.destination);
+        osc.type = "square";
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.08, ac.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + delay + dur);
+        osc.start(ac.currentTime + delay);
+        osc.stop(ac.currentTime + delay + dur);
+      } catch(_) {}
+    }
+
     async function eggAlien() {
       clearScreen();
       const glyphSet = "█▓▒░▄▀■□▪◘◙†‡•◦∞≈≠∂∑";
@@ -426,6 +441,8 @@ Press any key to continue _`;
         const len = 40 + Math.floor(Math.random() * 20);
         for (let j = 0; j < len; j++) row += glyphSet[Math.floor(Math.random() * glyphSet.length)];
         glitch.textContent = row;
+        // Random static bleeps during glitch phase
+        if (Math.random() > 0.5) alienBleep(200 + Math.random() * 2000, 0.05 + Math.random() * 0.1);
         await wait(50 + Math.random() * 50);
       }
 
@@ -433,17 +450,21 @@ Press any key to continue _`;
       await wait(400);
 
       const msg = [
-        "",
-        "  ** TRANSMISSION RECEIVED **",
-        "",
-        "  WE KNOW YOU ARE THERE, HUMAN.",
-        "  WE HAVE BEEN WATCHING.",
-        "  YOUR BEERMAT DOODLES AMUSE US.",
-        "",
-        "  GREETINGS FROM SECTOR 7.",
-        "",
+        { text: "",                                    bleep: null },
+        { text: "  ** TRANSMISSION RECEIVED **",       bleep: [880, 0.18] },
+        { text: "",                                    bleep: null },
+        { text: "  WE KNOW YOU ARE THERE, HUMAN.",     bleep: [440, 0.12] },
+        { text: "  WE HAVE BEEN WATCHING.",             bleep: [520, 0.10] },
+        { text: "  YOUR BEERMAT DOODLES AMUSE US.",    bleep: [660, 0.10] },
+        { text: "",                                    bleep: null },
+        { text: "  GREETINGS FROM SECTOR 7.",          bleep: [1100, 0.22] },
+        { text: "",                                    bleep: null },
       ];
-      for (const line of msg) { appendLine(line, "bright"); await wait(220); }
+      for (const { text, bleep } of msg) {
+        if (bleep) alienBleep(bleep[0], bleep[1]);
+        appendLine(text, "bright");
+        await wait(240);
+      }
       await wait(1600);
     }
 
