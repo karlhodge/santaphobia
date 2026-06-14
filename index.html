@@ -168,6 +168,31 @@
     // ─── Helpers ──────────────────────────────────────────────────────────────
     const screen = document.getElementById("screen");
     const wait   = ms => new Promise(r => setTimeout(r, ms));
+    let audioCtx = null;
+
+    function unlockAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+    }
+
+    function waitForKeypress() {
+      return new Promise(resolve => {
+        const hint = document.createElement("div");
+        hint.textContent = "PRESS ANY KEY TO CONTINUE";
+        hint.style.animation = "blink 0.75s step-end infinite";
+        screen.appendChild(hint);
+
+        function handler(e) {
+          document.removeEventListener("keydown", handler);
+          document.removeEventListener("click",   handler);
+          unlockAudio();
+          hint.remove();
+          resolve();
+        }
+        document.addEventListener("keydown", handler);
+        document.addEventListener("click",   handler);
+      });
+    }
 
     function escHtml(s) {
       return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -329,7 +354,7 @@ Press any key to continue _`;
 
       // Synthesise modem handshake tones
       try {
-        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
         const tones = [
           [2100,0.40],[1300,0.28],[2100,0.18],[800,0.14],
           [1300,0.10],[2400,0.18],[1200,0.14],[2400,0.10],
@@ -635,6 +660,8 @@ Press any key to continue _`;
 
       await runBootLines();
       await wait(350);
+      await waitForKeypress();
+      await wait(200);
 
       if (visits > 1) {
         const egg = EGGS[Math.floor(Math.random() * EGGS.length)];
