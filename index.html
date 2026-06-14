@@ -456,10 +456,10 @@ Press any key to continue _`;
       for (const line of lines) {
         for (const ch of line) {
           if (ch.trim()) keyClick();
-          await wait(63 + Math.random() * 77);
+          await wait(95 + Math.random() * 115);
         }
         appendLine(line);
-        await wait(60 + Math.random() * 60);
+        await wait(20 + Math.random() * 25);
       }
       await wait(700);
     }
