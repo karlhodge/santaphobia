@@ -414,31 +414,25 @@ Press any key to continue _`;
       await wait(900);
     }
 
-    function hackerModem(duration) {
+    function keyClick() {
       try {
         const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        const end = ac.currentTime + duration;
-        let t = ac.currentTime;
-        while (t < end) {
-          const freq = 600 + Math.random() * 2800;
-          const dur  = 0.04 + Math.random() * 0.12;
-          const osc  = ac.createOscillator();
-          const gain = ac.createGain();
-          osc.connect(gain); gain.connect(ac.destination);
-          osc.type = Math.random() > 0.5 ? "sawtooth" : "square";
-          osc.frequency.setValueAtTime(freq, t);
-          osc.frequency.linearRampToValueAtTime(freq * (0.7 + Math.random() * 0.8), t + dur);
-          gain.gain.setValueAtTime(0.07, t);
-          gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
-          osc.start(t); osc.stop(t + dur);
-          t += dur * (0.6 + Math.random() * 0.5);
-        }
+        const buf = ac.createBuffer(1, ac.sampleRate * 0.04, ac.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+        const src  = ac.createBufferSource();
+        const gain = ac.createGain();
+        const filt = ac.createBiquadFilter();
+        src.buffer = buf;
+        filt.type = "bandpass"; filt.frequency.value = 3000; filt.Q.value = 0.8;
+        src.connect(filt); filt.connect(gain); gain.connect(ac.destination);
+        gain.gain.setValueAtTime(0.25, ac.currentTime);
+        src.start(); src.stop(ac.currentTime + 0.04);
       } catch(_) {}
     }
 
     async function eggHacker() {
       clearScreen();
-      hackerModem(3.5);
       const lines = [
         "Initialising intrusion protocol...",
         "Scanning target: 192.168.0.1 ...",
@@ -460,8 +454,12 @@ Press any key to continue _`;
         "",
       ];
       for (const line of lines) {
+        for (const ch of line) {
+          if (ch.trim()) keyClick();
+          await wait(18 + Math.random() * 22);
+        }
         appendLine(line);
-        await wait(70 + Math.random() * 90);
+        await wait(60 + Math.random() * 60);
       }
       await wait(700);
     }
