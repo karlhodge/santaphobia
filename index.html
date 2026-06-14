@@ -402,8 +402,31 @@ Press any key to continue _`;
       await wait(900);
     }
 
+    function hackerModem(duration) {
+      try {
+        const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        const end = ac.currentTime + duration;
+        let t = ac.currentTime;
+        while (t < end) {
+          const freq = 600 + Math.random() * 2800;
+          const dur  = 0.04 + Math.random() * 0.12;
+          const osc  = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.connect(gain); gain.connect(ac.destination);
+          osc.type = Math.random() > 0.5 ? "sawtooth" : "square";
+          osc.frequency.setValueAtTime(freq, t);
+          osc.frequency.linearRampToValueAtTime(freq * (0.7 + Math.random() * 0.8), t + dur);
+          gain.gain.setValueAtTime(0.07, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+          osc.start(t); osc.stop(t + dur);
+          t += dur * (0.6 + Math.random() * 0.5);
+        }
+      } catch(_) {}
+    }
+
     async function eggHacker() {
       clearScreen();
+      hackerModem(3.5);
       const lines = [
         "Initialising intrusion protocol...",
         "Scanning target: 192.168.0.1 ...",
