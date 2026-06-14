@@ -323,6 +323,22 @@
     }
 
     async function eggBSOD() {
+      // Windows-style error bong: two sine tones in quick succession
+      try {
+        const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        [[392, 0, 0.3], [261, 0.28, 0.5]].forEach(([freq, delay, dur]) => {
+          const osc  = ac.createOscillator();
+          const gain = ac.createGain();
+          osc.connect(gain); gain.connect(ac.destination);
+          osc.type = "sine";
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.5, ac.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + delay + dur);
+          osc.start(ac.currentTime + delay);
+          osc.stop(ac.currentTime + delay + dur);
+        });
+      } catch(_) {}
+
       const bsod = document.getElementById("bsod");
       bsod.textContent =
 `Windows
