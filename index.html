@@ -414,20 +414,17 @@ Press any key to continue _`;
       await wait(900);
     }
 
-    function keyClick() {
+    function hackerBeep() {
       try {
         const ac = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        const buf = ac.createBuffer(1, ac.sampleRate * 0.04, ac.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-        const src  = ac.createBufferSource();
+        const osc  = ac.createOscillator();
         const gain = ac.createGain();
-        const filt = ac.createBiquadFilter();
-        src.buffer = buf;
-        filt.type = "bandpass"; filt.frequency.value = 3000; filt.Q.value = 0.8;
-        src.connect(filt); filt.connect(gain); gain.connect(ac.destination);
-        gain.gain.setValueAtTime(0.25, ac.currentTime);
-        src.start(); src.stop(ac.currentTime + 0.04);
+        osc.connect(gain); gain.connect(ac.destination);
+        osc.type = "square";
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.08, ac.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.06);
+        osc.start(); osc.stop(ac.currentTime + 0.06);
       } catch(_) {}
     }
 
@@ -454,12 +451,9 @@ Press any key to continue _`;
         "",
       ];
       for (const line of lines) {
-        for (const ch of line) {
-          if (ch.trim()) keyClick();
-          await wait(95 + Math.random() * 115);
-        }
+        hackerBeep();
         appendLine(line);
-        await wait(4 + Math.random() * 5);
+        await wait(120 + Math.random() * 80);
       }
       await wait(700);
     }
