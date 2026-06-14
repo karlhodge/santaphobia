@@ -453,11 +453,24 @@ Press any key to continue _`;
       appendLine("");
       await wait(600);
 
-      for (let i = 10; i >= 1; i--) {
-        appendLine(`T-MINUS ${i}...`);
-        await wait(480);
+      function speak(text) {
+        return new Promise(resolve => {
+          const utt = new SpeechSynthesisUtterance(text);
+          utt.rate = 0.85;
+          utt.pitch = 0.6;
+          utt.volume = 1;
+          utt.onend = resolve;
+          utt.onerror = resolve;
+          speechSynthesis.speak(utt);
+        });
       }
 
+      for (let i = 10; i >= 1; i--) {
+        appendLine(`T-MINUS ${i}...`);
+        await speak(String(i));
+      }
+
+      await speak("Detonating.");
       document.body.classList.add("shaking");
       await wait(1400);
       document.body.classList.remove("shaking");
