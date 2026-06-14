@@ -520,15 +520,28 @@ Press any key to continue _`;
       await wait(1400);
     }
 
+    function woprSpeak(text) {
+      return new Promise(resolve => {
+        const utt = new SpeechSynthesisUtterance(text);
+        utt.rate  = 0.8;
+        utt.pitch = 0.4;
+        utt.volume = 1;
+        utt.onend  = resolve;
+        utt.onerror = resolve;
+        speechSynthesis.speak(utt);
+      });
+    }
+
     async function eggThermonuclear() {
       clearScreen();
       await wait(300);
       appendLine("");
       appendLine("  GREETINGS, PROFESSOR FALKEN.");
-      await wait(1100);
+      await woprSpeak("Greetings, Professor Falken.");
       appendLine("");
       appendLine("  SHALL WE PLAY A GAME?");
-      await wait(900);
+      await woprSpeak("Shall we play a game?");
+      await wait(400);
       appendLine("");
 
       await new Promise(resolve => {
@@ -544,11 +557,13 @@ Press any key to continue _`;
           "font:inherit;caret-color:#33ff33;width:2ch;padding:0;margin:0;";
         wrap.appendChild(label); wrap.appendChild(inp);
         screen.appendChild(wrap);
+        woprSpeak("Do you want to play Global Thermonuclear War?");
         inp.focus();
 
         inp.addEventListener("keydown", async function h(e) {
           if (e.key !== "Enter") return;
           inp.removeEventListener("keydown", h);
+          speechSynthesis.cancel();
           const ans = inp.value.trim().toUpperCase();
           const frozen = document.createElement("div");
           frozen.textContent = `  DO YOU WANT TO PLAY GLOBAL THERMONUCLEAR WAR? (Y/N) ${inp.value}`;
@@ -558,9 +573,11 @@ Press any key to continue _`;
             await wait(400);
             appendLine("");
             appendLine("  A STRANGE GAME.");
-            await wait(600);
+            woprSpeak("A strange game.");
+            await wait(800);
             appendLine("  THE ONLY WINNING MOVE IS NOT TO PLAY.");
-            await wait(900);
+            await woprSpeak("The only winning move is not to play.");
+            await wait(400);
             document.body.classList.add("exploding");
             clearScreen();
             await wait(2600);
@@ -569,7 +586,8 @@ Press any key to continue _`;
             await wait(400);
             appendLine("");
             appendLine("  WISE DECISION.");
-            await wait(1200);
+            await woprSpeak("Wise decision.");
+            await wait(600);
           }
           resolve();
         });
