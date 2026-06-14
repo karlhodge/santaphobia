@@ -133,14 +133,26 @@
       return `${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}-${y}`;
     }
 
+    function randTime() {
+      const h   = 1 + Math.floor(Math.random() * 12);
+      const min = Math.floor(Math.random() * 60);
+      const ampm = Math.random() > 0.5 ? "a" : "p";
+      return `${String(h).padStart(2," ")}:${String(min).padStart(2,"0")}${ampm}`;
+    }
+
+    function randSize() {
+      const kb = Math.floor(Math.random() * 980000) + 1024;
+      return String(kb.toLocaleString("en-US")).padStart(11," ");
+    }
+
     const DIRECTORY = [
-      { name: "ABOUT    ", size: "      <DIR>", date: randDate(), text:
+      { name: "ABOUT    ", date: randDate(), text:
           "Beermat Doodles is the home of web toys developed by journalist and\n" +
           "lecturer Dr Karl Hodge. Select or type the name of a toy you want to\n" +
           "play with." },
-      { name: "GALLERY  ", size: "      <DIR>", date: randDate(), url: "/gallery/" },
-      { name: "STUDIO   ", size: "      <DIR>", date: randDate(), url: "/studio/" },
-      { name: "REPORTER ", size: "      <DIR>", date: randDate(), url: "/reporter/" },
+      { name: "GALLERY  ", date: randDate(), url: "/gallery/" },
+      { name: "STUDIO   ", date: randDate(), url: "/studio/" },
+      { name: "REPORTER ", date: randDate(), url: "/reporter/" },
     ];
 
     // ─── Boot messages ────────────────────────────────────────────────────────
@@ -664,7 +676,7 @@ Press any key to continue _`;
       for (const entry of DIRECTORY) {
         const row  = document.createElement("div");
         row.style.marginLeft = "1ch";
-        const label = `${entry.date}  12:00p   ${entry.size}  ${entry.name}`;
+        const label = `${entry.date}  ${randTime()}  ${randSize()}  ${entry.name}`;
         if (entry.url) {
           const link = document.createElement("a");
           link.className   = "dir-entry";
